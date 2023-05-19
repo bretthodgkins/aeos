@@ -2,7 +2,7 @@ require('dotenv').config()
 
 import store from './store';
 import logger from './logger';
-import Plugin from './pluginInterface';
+import AeosPlugin from './pluginInterface';
 import * as chatCompletion from './chatCompletion';
 
 import { 
@@ -25,13 +25,13 @@ store.addKeyValueToStore('enableLogToFile', 'false');
 
 // types
 export { 
+  AeosPlugin,
   Command,
   CommandExample,
   CommandExecutable,
   CommandInput,
   CommandResult,
   CommandType,
-  Plugin,
 };
 
 // functions

@@ -5,6 +5,7 @@ import * as utils from './utils';
 import * as flowControls from './flow_controls';
 import logger from "./logger";
 import store from './store';
+import pluginManager from './pluginManager';
 
 import { 
   Command,
@@ -185,11 +186,24 @@ function getUserCommands(): Command[] {
   return commandList;
 }
 
+
 let allCommands = [
   ...controlCommands,
   ...getUserCommands(),
 ];
-logger.log(`Loaded ${allCommands.length} commands`);
+
+export function loadAllCommands() {
+  const userCommands = getUserCommands();
+  const pluginCommands = pluginManager.getCommands();
+  allCommands = [
+    ...controlCommands,
+    ...userCommands,
+    ...pluginCommands,
+  ];
+  logger.log(`Loaded ${controlCommands.length} native commands`);
+  logger.log(`Loaded ${pluginCommands.length} commands from plugins`);
+  logger.log(`Loaded ${userCommands.length} user-defined commands`);
+}
 
 
 export function getAllCommandFormats(): string[] {

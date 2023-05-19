@@ -5,79 +5,100 @@ import { Command } from 'commander';
 
 import store from './store';
 import logger from './logger';
+import pluginManager from './pluginManager';
 
 import { 
   getAllCommandFormats,
+  loadAllCommands,
   runCommands,
 } from './commands';
 
-const program = new Command();
+async function main() {
+  await pluginManager.loadPlugins();
+  loadAllCommands();
 
-program
-  .version('1.0.0')
-  .option('-d, --debug', 'enable debug console logs')
-  .option('-l, --log', 'enable debug logging to file')
+  const program = new Command();
 
-program
-  .command('commands')
-  .description('list all commands')
-  .action(() => {
-    console.log('\n\nListing all commands...\n');
-    const allCommandFormats = getAllCommandFormats().sort().map((commandFormat) => {
-      return ` - ${commandFormat}`
-    }).join('\n');
-    console.log(allCommandFormats);
-  });
+  program
+    .version('1.0.0')
+    .option('-d, --debug', 'enable debug console logs')
+    .option('-l, --log', 'enable debug logging to file')
 
-program
-  .command('run <commands...>')
-  .description('Run specific commands')
-  .action(async (commands) => {
-    if (program.opts().debug) {
-      store.addKeyValueToStore('enableLogToConsole', 'true');
-    }
+  program
+    .command('commands')
+    .description('list all commands')
+    .action(() => {
+      console.log('\n\nListing all commands...\n');
+      const allCommandFormats = getAllCommandFormats().sort().map((commandFormat) => {
+        return ` - ${commandFormat}`
+      }).join('\n');
+      console.log(allCommandFormats);
+    });
 
-    if (program.opts().log) {
-      store.addKeyValueToStore('enableLogToFile', 'true');
-    }
+  program
+    .command('run <commands...>')
+    .description('Run specific commands')
+    .action(async (commands) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
 
-    logger.log(`Running commands: ${commands.join(', ')}`);
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
 
-    const result = await runCommands(commands);
-  
-    if (result.success) {
-      logger.log(`Commands resolved successfully`);
-    } else {
-      logger.log(`Commands failed. ${result.message}`);
-    }
-  });
+      logger.log(`Running commands: ${commands.join(', ')}`);
 
-program
-  .command('plugins')
-  .description('list all plugins')
-  .action(() => {
-    console.log('Listing all plugins...');
-  });
+      const result = await runCommands(commands);
+    
+      if (result.success) {
+        logger.log(`Commands resolved successfully`);
+      } else {
+        logger.log(`Commands failed. ${result.message}`);
+      }
+    });
 
-program
-  .command('install <plugin>')
-  .description('install a specific plugin')
-  .action((plugin) => {
-    console.log(`Installing plugin: ${plugin}`);
-  });
+  program
+    .command('plugins')
+    .description('list all plugins')
+    .action(() => {
+      const plugins = pluginManager.getPlugins();
+      if (plugins.length === 0) {
+        console.log('No plugins installed');
+        return;
+      }
+      console.log(plugins.sort((a, b) => {
+        return a.name.localeCompare(b.name);
+      }).map((plugin) => {
+        if (plugin.description === undefined) {
+          return `  ${plugin.name}@${plugin.version}`
+        }
+        return `  ${plugin.name}@${plugin.version} - ${plugin.description}`
+      }).join('\n'));
+    });
 
-program
-  .command('update <plugin>')
-  .description('update a specific plugin')
-  .action((plugin) => {
-    console.log(`Updating plugin: ${plugin}`);
-  });
+  program
+    .command('install <plugin>')
+    .description('install a specific plugin')
+    .action((plugin) => {
+      pluginManager.installPlugin(plugin);
+    });
 
-program
-  .command('remove <plugin>')
-  .description('remove a specific plugin')
-  .action((plugin) => {
-    console.log(`Removing plugin: ${plugin}`);
-  });
+  program
+    .command('update <plugin>')
+    .description('update a specific plugin')
+    .action((plugin) => {
+      console.log(`Not implemented yet`);
+    });
 
-program.parse(process.argv);
+  program
+    .command('uninstall <plugin>')
+    .description('uninstall a specific plugin')
+    .action((plugin) => {
+      pluginManager.uninstallPlugin(plugin);
+    });
+
+  program.parse(process.argv);
+}
+
+main();
