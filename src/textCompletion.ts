@@ -1,8 +1,8 @@
 import { Configuration, OpenAIApi } from "openai";
 const JSON5 = require('json5')
 
-import * as notifications from './notifications';
 import logger from "./logger";
+import notifications from './notifications';
 
 export type GPTResponse = {
   output: string;
@@ -30,7 +30,7 @@ Response: ['move mouse to coordinates 0 0']
 Prompt: 'Can you please click on the spotify icon wait 1 second and then click on the play button'
 Response: ['move mouse to image spotify-icon', 'click', 'wait 1 seconds', 'move mouse to image play-button', 'click']
 
-Prompt: 'move the cursor to right by 100 pixels and display a notification that says successfully completed task'
+Prompt: 'move the cursor to right by 100 pixels and push a notification that says successfully completed task'
 Response: ['move mouse right 100', 'notification "Aeos" "Successfully completed task"']
 
 Prompt: 'create a task to write story about a space cat'
@@ -176,7 +176,7 @@ export async function convertStrings(examples: Record<string,string>, strings: s
     conversionMap = { ...conversionMap, ...chunkMap };
     if (i < chunks.length - 1) {
       const percentComplete = Math.floor((chunkSize * (i + 1)) / uniqueValues.length * 100);
-      notifications.displayNotification('Converting Clipboard', `${percentComplete}% complete`);
+      notifications.push('Converting Clipboard', `${percentComplete}% complete`);
     }
   }
 

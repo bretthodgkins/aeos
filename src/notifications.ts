@@ -5,24 +5,32 @@ export type NotificationHandler = {
   handler: (title: string, body: string) => void;
 }
 
-let notificationHandlers: NotificationHandler[] = [
-  { name: 'log', handler: logHandler },
-];
+class Notifications {
+  private handlers: NotificationHandler[];
 
-export function registerNotificationHandler(handler: NotificationHandler) {
-  notificationHandlers.push(handler);
-}
+  constructor() {
+    this.handlers = [
+      { name: 'log', handler: this.logHandler },
+    ];
+  }
 
-export function unregisterNotificationHandler(name: string) {
-  notificationHandlers = notificationHandlers.filter(handler => handler.name !== name);
-}
+  registerHandler(handler: NotificationHandler) {
+    this.handlers.push(handler);
+  }
 
-export function logHandler(title: string, body: string) {
-  logger.log(`${title}: ${body}`);
-}
+  unregisterHandler(name: string) {
+    this.handlers = this.handlers.filter(handler => handler.name !== name);
+  }
 
-export function displayNotification(title: string, body: string) {
-  for (const handler of notificationHandlers) {
-    handler.handler(title, body);
+  push(title: string, body: string) {
+    for (const handler of this.handlers) {
+      handler.handler(title, body);
+    }
+  }
+
+  private logHandler(title: string, body: string) {
+    logger.log(`${title}: ${body}`);
   }
 }
+
+export default new Notifications();

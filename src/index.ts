@@ -7,7 +7,10 @@ import * as chatCompletion from './chatCompletion';
 
 import { 
   getAllCommandFormats,
+  getCommandExecutablesFromCommandInput,
+  getIsRunning,
   runCommands,
+  setIsRunningFalse,
 } from './commands';
 
 import { 
@@ -17,6 +20,7 @@ import {
   CommandInput,
   CommandResult,
   CommandType,
+  getCommandInputString,
 } from './command_types';
 
 // Disable debug logs by default as package
@@ -37,6 +41,10 @@ export {
 // functions
 export {
   getAllCommandFormats,
+  getCommandExecutablesFromCommandInput,
+  getCommandInputString,
+  getIsRunning,
+  setIsRunningFalse,
   runCommands
 };
 

@@ -1,9 +1,9 @@
 import * as controls from './controls';
-import * as notifications from './notifications';
 import * as chatCompletion from './chatCompletion';
 import * as utils from './utils';
 import * as flowControls from './flow_controls';
 import logger from "./logger";
+import notifications from './notifications';
 import store from './store';
 import pluginManager from './pluginManager';
 
@@ -65,9 +65,9 @@ const controlCommands: Command[] = [
   },
   {
     "format": "notification ${title} ${body}",
-    "description": "Displays a notification with the given title and body.",
+    "description": "Pushes a notification with the given title and body to registered handlers.",
     "type": CommandType.Function,
-    "function": controls.displayNotification,
+    "function": controls.pushNotification,
     "requiresExactMatch": false,
   },
   {
@@ -136,7 +136,7 @@ function getUserCommandsFromFile(path: string): Command[] {
   let commandList: Command[] = [];
   for (let inputCommand of inputJson.commands) {
     if (!inputCommand.format || !inputCommand.sequence || inputCommand.sequence.length === 0) {
-      notifications.displayNotification("Error", `Invalid command found in ${path}`);
+      notifications.push("Error", `Invalid command found in ${path}`);
       return [];
     }
 
@@ -245,7 +245,7 @@ export async function getCommandExecutablesFromCommandInput(commandInput: Comman
         commandInput,
       }];
   } else if (matchingFormats.length > 1) {
-    notifications.displayNotification('Error', `Multiple commands found matching "${commandInputString}"`);
+    notifications.push('Error', `Multiple commands found matching "${commandInputString}"`);
     throw ('Multiple commands found matching input');
   } 
 
@@ -269,7 +269,7 @@ export async function getCommandExecutablesFromCommandInput(commandInput: Comman
   } 
 
   if (!useNLP) {
-    notifications.displayNotification('Error', `Command not found: ${commandInputString}`);
+    notifications.push('Error', `Command not found: ${commandInputString}`);
     throw (`Unable to find command: ${commandInputString}`);
   }
 
@@ -287,7 +287,7 @@ export async function getCommandExecutablesFromCommandInput(commandInput: Comman
   }
 
   if (!commandExecutableList.length) {
-    notifications.displayNotification('Error', `Predicted invalid command: ${commandInputString}`);
+    notifications.push('Error', `Predicted invalid command: ${commandInputString}`);
     throw ('Command not found');
   }
 

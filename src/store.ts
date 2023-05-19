@@ -1,8 +1,13 @@
 import fs from 'fs';
 import JSON5 from 'json5';
-import { CommandInput, getCommandInputString, setCommandInputString } from './command_types';
 
-const defaultConfigPath = './config-default.json5';
+import { 
+  CommandInput, 
+  getCommandInputString, 
+  setCommandInputString,
+} from './command_types';
+
+import config from './config';
 
 class Store {
   private store: Record<string, string>;
@@ -11,7 +16,8 @@ class Store {
     this.store = {
       'enableLogToConsole': 'false',
       'enableLogToFile': 'false',
-      ...this.getConfigFromFile(),
+      ...config.getConfiguration(),
+      ...config.getUserVariables(),
     };
   }
 
@@ -43,35 +49,6 @@ class Store {
 
   getValue(key: string): string | undefined {
     return this.store[key];
-  }
-
-  private getConfigFromFile(): Record<string, string> {
-    const configPath = './config.json5';
-
-    let inputRaw: any;
-    try {
-      inputRaw = fs.readFileSync(configPath);
-    } catch(e) {
-      // Create config.json5 from config-default.json5 if it doesn't exist
-      try {
-        inputRaw = fs.readFileSync(defaultConfigPath);
-        fs.writeFileSync(configPath, inputRaw);
-      }
-      catch(e) {
-        console.log(`Error: Unable to read ${defaultConfigPath}`);
-        return {};
-      }
-    }
-
-    let inputJson: any;
-    try {
-      inputJson = JSON5.parse(inputRaw);
-      return {...inputJson.configuration, ...inputJson.userVariables};
-
-    } catch(e) {
-      console.log(`Error: Unable to parse json in ${configPath}`);
-      return {};
-    }
   }
 }
 

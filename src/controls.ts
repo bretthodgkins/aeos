@@ -5,9 +5,9 @@ const request = require('request');
 
 import { CommandResult } from '../src/command_types';
 
-import * as notifications from './notifications';
 import * as textCompletion from './textCompletion';
 import logger from "./logger";
+import notifications from './notifications';
 import store from './store';
 
 
@@ -83,7 +83,7 @@ export async function waitInMilliseconds(args: Record<string, string>): Promise<
   return { success: true } as CommandResult;
 }
 
-export async function displayNotification(args: Record<string, string>): Promise<CommandResult> {
+export async function pushNotification(args: Record<string, string>): Promise<CommandResult> {
   if (!args.title || !args.body) {
     return {
       success: false,
@@ -91,7 +91,7 @@ export async function displayNotification(args: Record<string, string>): Promise
     };
   }
 
-  notifications.displayNotification(args.title, args.body);
+  notifications.push(args.title, args.body);
   return { success: true } as CommandResult;
 }
 
@@ -113,7 +113,7 @@ export async function writeToFile(args: Record<string, string>): Promise<Command
 
   try {
     await fs.promises.writeFile(args.filePath, content.replace(/\\n/g, '\n'));
-    displayNotification({ title: 'Success', body: `File saved to ${args.filePath}` });
+    pushNotification({ title: 'Success', body: `File saved to ${args.filePath}` });
   } catch (err) {
     return {
       success: false,
@@ -145,9 +145,9 @@ export async function appendToFile(args: Record<string, string>): Promise<Comman
 
   try {
     await fs.promises.writeFile(args.filePath, contentToAppend, { flag: 'a' });
-    displayNotification({ title: 'Success', body: `File saved to ${args.filePath}` });
+    pushNotification({ title: 'Success', body: `File saved to ${args.filePath}` });
   } catch (err) {
-    displayNotification({ title: 'Error', body: `Unable to write to file ${args.filePath}` });
+    pushNotification({ title: 'Error', body: `Unable to write to file ${args.filePath}` });
     return { 
       success: false,
       message: `Unable to write to file ${args.filePath}`,
