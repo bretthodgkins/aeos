@@ -2,6 +2,8 @@ import fs from 'fs';
 import JSON5 from 'json5';
 import { CommandInput, getCommandInputString, setCommandInputString } from './command_types';
 
+const defaultConfigPath = './config-default.json5';
+
 class Store {
   private store: Record<string, string>;
 
@@ -50,8 +52,15 @@ class Store {
     try {
       inputRaw = fs.readFileSync(configPath);
     } catch(e) {
-      console.log(`Warning: No config file found at ${configPath}`);
-      return {}; // no config file 
+      // Create config.json5 from config-default.json5 if it doesn't exist
+      try {
+        inputRaw = fs.readFileSync(defaultConfigPath);
+        fs.writeFileSync(configPath, inputRaw);
+      }
+      catch(e) {
+        console.log(`Error: Unable to read ${defaultConfigPath}`);
+        return {};
+      }
     }
 
     let inputJson: any;

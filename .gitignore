@@ -12,6 +12,9 @@
 # Environment variables
 .env
 
+# Config file
+config.json5
+
 # XLSX files
 *.csv
 *.xlsx

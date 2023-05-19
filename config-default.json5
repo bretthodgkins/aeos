@@ -6,4 +6,7 @@
     userVariables: {
       // key value pairs that will be available on startup
     },
+    plugins: [
+      // accepts local paths or npm package names
+    ],
   }
