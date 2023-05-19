@@ -1,0 +1,11 @@
+{
+  commands: [
+    {
+      format: 'write a poem about ${prompt}',
+      sequence: [
+        'generate text write a poem about ${prompt}',
+        'console log ${lastGeneratedText}',
+      ]
+    },
+  ]
+}

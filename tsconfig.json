@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "module": "commonjs",
+    "strict": true,
+    "outDir": "./dist",
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+  },
+  "include": [
+    "src/**/*.ts",
+    "commands/*.json"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
