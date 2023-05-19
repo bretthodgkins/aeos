@@ -1,13 +1,18 @@
 require('dotenv').config()
 
-import store from './store';
 import logger from './logger';
+import notifications from './notifications';
+import store from './store';
+
 import AeosPlugin from './pluginInterface';
+
 import * as chatCompletion from './chatCompletion';
+import * as textCompletion from './textCompletion';
 
 import { 
   getAllCommandFormats,
   getCommandExecutablesFromCommandInput,
+  getCommandFromFormat,
   getIsRunning,
   runCommands,
   setIsRunningFalse,
@@ -42,6 +47,7 @@ export {
 export {
   getAllCommandFormats,
   getCommandExecutablesFromCommandInput,
+  getCommandFromFormat,
   getCommandInputString,
   getIsRunning,
   setIsRunningFalse,
@@ -52,5 +58,7 @@ export {
 export { 
   chatCompletion,
   logger, 
-  store 
+  notifications,
+  store,
+  textCompletion,
 };
