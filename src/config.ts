@@ -1,8 +1,21 @@
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import process from 'process';
 import JSON5 from 'json5';
 
-const configPath = './config.json5';
-const defaultConfigPath = './config-default.json5';
+const defaultConfig = {
+  configuration: {
+    enableLogToConsole: false, // enables debug logs
+    enableLogToFile: false, // writes debug logs to ./access.log
+  },
+  userVariables: {
+    // key value pairs that will be available on startup
+  },
+  plugins: [
+    // accepts local paths or npm package names
+  ],
+};
 
 type ConfigType = {
   configuration: Record<string, string>;
@@ -21,18 +34,42 @@ class Config {
     this.loadConfig();
   }
 
+  private getConfigPath(): string {
+    // Check the operating system
+    if (process.platform === 'win32') {
+      // On Windows, use the AppData directory
+      if (!process.env.APPDATA) {
+        console.log('Error: APPDATA environment variable is not defined');
+        process.exit(1);
+      }
+
+      // Ensure the directory exists
+      const configDirectory = path.join(process.env.APPDATA, 'aeos');
+      fs.mkdirSync(configDirectory, { recursive: true });
+
+      return path.join(configDirectory, 'config.json5');
+    } else {
+      // On Linux/Mac, use a dotfile in the home directory
+      const configDirectory = path.join(os.homedir(), '.aeos');
+      fs.mkdirSync(configDirectory, { recursive: true });
+
+      return path.join(configDirectory, 'config.json5');
+    }
+  }
+
   loadConfig(): void {
     let inputRaw: any;
     try {
-      inputRaw = fs.readFileSync(configPath);
+      inputRaw = fs.readFileSync(this.getConfigPath());
     } catch(e) {
-      // Create config.json5 from config-default.json5 if it doesn't exist
+      // Create config.json5 from defaultConfig if it doesn't exist
       try {
-        inputRaw = fs.readFileSync(defaultConfigPath);
-        fs.writeFileSync(configPath, inputRaw);
+        fs.writeFileSync(this.getConfigPath(), JSON.stringify(defaultConfig, null, 2));
+        inputRaw = fs.readFileSync(this.getConfigPath());
+        console.log(`Created ${this.getConfigPath()} from default config.`);
       }
       catch(e) {
-        console.log(`Error: Unable to read ${defaultConfigPath}`);
+        console.log(`Error: Unable to write ${this.getConfigPath()}`);
         return;
       }
     }
@@ -41,7 +78,7 @@ class Config {
     try {
       inputJson = JSON5.parse(inputRaw);
     } catch(e) {
-      console.log(`Error: Unable to parse json in ${configPath}`);
+      console.log(`Error: Unable to parse json in ${this.getConfigPath()}`);
       return;
     }
 
@@ -81,7 +118,7 @@ class Config {
   }
 
   saveConfig(): void {
-    fs.writeFileSync(configPath, JSON5.stringify(this.config, null, 2));
+    fs.writeFileSync(this.getConfigPath(), JSON5.stringify(this.config, null, 2));
   }
 }
 

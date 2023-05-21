@@ -2,7 +2,7 @@
 
 Aeos is an open-source AI automation platform that harnesses the power of Large Language Models (LLMs) to build and run complex automations.
 
-It's designed to be highly extendible, by allowing users to create their own automations, and provide examples of them being called using natural language.
+It's designed to be highly extendible, allowing users to create their own automations, and provide examples of them being called using natural language.
 
 It also supports a robust plugin system which adds capabilities such as computer vision, OCR, image recognition, browser automation, GUI automation, as well as, integrations with many popular applications including Google Sheets, Google Drive, Notion, Slack, Hubspot, AWS and many more.
 
