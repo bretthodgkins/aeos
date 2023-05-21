@@ -20,7 +20,7 @@ async function main() {
   const program = new Command();
 
   program
-    .version('1.0.0')
+    .version('1.0.1')
     .option('-d, --debug', 'enable debug console logs')
     .option('-l, --log', 'enable debug logging to file')
 
