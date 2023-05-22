@@ -1,18 +1,23 @@
 import fs from 'fs';
-import JSON5 from 'json5';
+import path from 'path';
+import { execSync } from 'child_process';
 
 import { Command } from './command_types';
 
 import config from './config';
 import AeosPlugin from './pluginInterface';
 
-const defaultConfigPath = './config-default.json5';
-
 class PluginManager {
   private plugins: Map<string, AeosPlugin>;
 
   constructor() {
     this.plugins = new Map<string, AeosPlugin>();
+  }
+
+  getPluginsDirectory(): string {
+    const pluginDir = path.join(config.getConfigDirectory(), 'plugins');
+    fs.mkdirSync(pluginDir, { recursive: true });
+    return pluginDir;
   }
 
   async loadPlugins(): Promise<void> {
@@ -22,29 +27,108 @@ class PluginManager {
     }
   }
 
-  async loadPlugin(path: string): Promise<boolean> {
-    try {
-      const pluginModule = await import(path);
-      const plugin = pluginModule.default as AeosPlugin;
-      this.plugins.set(path, plugin);
-      return true;
-    } catch(e) {
-      console.log(`Error: Unable to load plugin ${path}\n`);
-      return false;
+  async loadPlugin(input: string): Promise<boolean> {
+      try {
+        let pluginModule;
+        if (fs.existsSync(input)) {
+          pluginModule = await import(input);
+        } else {
+          pluginModule = await import(path.join(this.getPluginsDirectory(), 'node_modules', input));
+        }
+        const plugin = pluginModule.default as AeosPlugin;
+        this.plugins.set(input, plugin);
+        return true;
+      } catch(e) {
+        console.log(`Error: Unable to load plugin ${input}\n`);
+        return false;
+      }
+  }
+
+  async installPlugin(input: string): Promise<void> {
+    // check if plugin is already installed
+    if (this.plugins.has(input)) {
+      console.log(`Plugin "${input}" is already installed`);
+      return;
     }
-  }
 
-  async installPlugin(path: string): Promise<void> {
-    const success = await this.loadPlugin(path);
-    if (!success) return;
-    config.addPlugin(path);
+    const fullPath = path.resolve(input);
+
+    // Check if input is a local path
+    if (fs.existsSync(fullPath)) {
+      const success = await this.loadPlugin(fullPath);
+      if (!success) {
+        console.log(`Error: Unable to load plugin ${fullPath}`);
+        return;
+      }
+      config.addPlugin(fullPath);
+    } else {
+      // Assume input is an npm package
+      try {
+        // Check if this package is already installed
+        require.resolve(path.join(this.getPluginsDirectory(), 'node_modules', input));
+        // continue to add plugin to config
+      } catch {
+        // If not, try to install it
+        try {
+          execSync(`npm install --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+        } catch (error) {
+          console.error(`\nFailed to install plugin ${input}`);
+          return;
+        }
+      }
+      const success = await this.loadPlugin(input);
+      if (!success) {
+        console.log(`Error: Unable to load plugin ${input}`);
+        return;
+      }
+      config.addPlugin(input);
+    }
+
     config.saveConfig();
   }
 
-  async uninstallPlugin(path: string): Promise<void> {
-    config.removePlugin(path);
+  async uninstallPlugin(input: string): Promise<void> {
+    // Perform npm uninstall if input is an npm package
+    const fullPath = path.resolve(input);
+    if (fs.existsSync(fullPath)) {
+      config.removePlugin(fullPath);
+    } else {
+      const installedPath = path.join(this.getPluginsDirectory(), 'node_modules', input);
+      if (fs.existsSync(installedPath)) {
+        try {
+          execSync(`npm uninstall --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+        } catch (error) {
+          console.error(`\nEncountered error while uninstalling plugin ${input}`);
+        }
+      }
+      config.removePlugin(input);
+    }
+
     config.saveConfig();
-    this.plugins.delete(path);
+    this.plugins.delete(input);
+  }
+
+  async updatePlugin(input: string): Promise<void> {
+    // check if plugin is installed
+    if (!this.plugins.has(input)) {
+      console.log(`Plugin "${input}" not installed`);
+      return;
+    }
+
+    // Perform npm update if input is an npm package
+    if (fs.existsSync(input)) { // not installed locally
+      console.log(`Plugin "${input}" is a local plugin. Please update manually.`);
+      return;
+    } else {
+      const installedPath = path.join(this.getPluginsDirectory(), 'node_modules', input);
+      if (fs.existsSync(installedPath)) {
+        try {
+          execSync(`npm update --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+        } catch (error) {
+          console.error(`\nEncountered error while updating plugin ${input}`);
+        }
+      }
+    }
   }
 
   getCommands(): Command[] {
@@ -55,8 +139,8 @@ class PluginManager {
     return allCommands;
   }
 
-  getPlugins(): AeosPlugin[] {
-    return Array.from(this.plugins.values());
+  getPlugins(): Map<string, AeosPlugin> {
+    return this.plugins;
   }
 }
 export default new PluginManager();

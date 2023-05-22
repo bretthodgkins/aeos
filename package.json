@@ -1,6 +1,6 @@
 {
   "name": "@bhodgk/aeos",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "An extensible personal assistant to automate everything using natural language",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

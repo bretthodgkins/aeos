@@ -34,7 +34,9 @@ class Config {
     this.loadConfig();
   }
 
-  private getConfigPath(): string {
+  getConfigDirectory(): string {
+    let dir = '';
+
     // Check the operating system
     if (process.platform === 'win32') {
       // On Windows, use the AppData directory
@@ -43,18 +45,19 @@ class Config {
         process.exit(1);
       }
 
-      // Ensure the directory exists
-      const configDirectory = path.join(process.env.APPDATA, 'aeos');
-      fs.mkdirSync(configDirectory, { recursive: true });
-
-      return path.join(configDirectory, 'config.json5');
+      dir = path.join(process.env.APPDATA, 'aeos');
     } else {
       // On Linux/Mac, use a dotfile in the home directory
-      const configDirectory = path.join(os.homedir(), '.aeos');
-      fs.mkdirSync(configDirectory, { recursive: true });
-
-      return path.join(configDirectory, 'config.json5');
+      dir = path.join(os.homedir(), '.aeos');
     }
+
+    // Ensure the directory exists
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  getConfigPath(): string {
+    return path.join(this.getConfigDirectory(), 'config.json5');
   }
 
   loadConfig(): void {
@@ -97,24 +100,26 @@ class Config {
     return this.config.plugins;
   }
 
-  addPlugin(path: string): void {
+  addPlugin(path: string): boolean {
     if (this.config.plugins.includes(path)) {
-      console.log(`Error: Plugin ${path} already installed`);
-      return;
+      console.log(`Plugin ${path} already installed`);
+      return false;
     }
 
     this.config.plugins.push(path);
     this.saveConfig();
+    return true;
   }
 
-  removePlugin(path: string): void {
+  removePlugin(path: string): boolean {
     if (!this.config.plugins.includes(path)) {
-      console.log(`Error: Plugin ${path} not installed`);
-      return;
+      console.log(`Plugin ${path} not installed`);
+      return false;
     }
 
     this.config.plugins = this.config.plugins.filter(plugin => plugin !== path);
     this.saveConfig();
+    return true;
   }
 
   saveConfig(): void {

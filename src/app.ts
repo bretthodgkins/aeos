@@ -12,6 +12,7 @@ import {
   loadAllCommands,
   runCommands,
 } from './commands';
+import AeosPlugin from './pluginInterface';
 
 async function main() {
   await pluginManager.loadPlugins();
@@ -37,7 +38,7 @@ async function main() {
 
   program
     .command('run <commands...>')
-    .description('Run specific commands')
+    .description('run sequence of commands')
     .action(async (commands) => {
       if (program.opts().debug) {
         store.addKeyValueToStore('enableLogToConsole', 'true');
@@ -62,24 +63,26 @@ async function main() {
     .command('plugins')
     .description('list all plugins')
     .action(() => {
-      const plugins = pluginManager.getPlugins();
-      if (plugins.length === 0) {
+      const plugins = pluginManager.getPlugins() as Map<string, AeosPlugin>;
+      if (plugins.size === 0) {
         console.log('No plugins installed');
         return;
       }
-      console.log(plugins.sort((a, b) => {
-        return a.name.localeCompare(b.name);
-      }).map((plugin) => {
+
+      let pluginList = [] as string[];
+      plugins.forEach((plugin, path) => {
         if (plugin.description === undefined) {
-          return `  ${plugin.name}@${plugin.version}`
+          pluginList.push(`  ${plugin.name}@${plugin.version} (${path})`);
+        } else {
+          pluginList.push(`  ${plugin.name}@${plugin.version} - ${plugin.description} (${path})`);
         }
-        return `  ${plugin.name}@${plugin.version} - ${plugin.description}`
-      }).join('\n'));
+      });
+      console.log(pluginList.sort().join('\n'));
     });
 
   program
     .command('install <plugin>')
-    .description('install a specific plugin')
+    .description('provide a npm package name or local path')
     .action((plugin) => {
       pluginManager.installPlugin(plugin);
     });
@@ -88,7 +91,7 @@ async function main() {
     .command('update <plugin>')
     .description('update a specific plugin')
     .action((plugin) => {
-      console.log(`Not implemented yet`);
+      pluginManager.updatePlugin(plugin);
     });
 
   program

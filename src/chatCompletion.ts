@@ -58,8 +58,6 @@ export async function findCommandGPT(input: string, availableCommands: string[],
     },
   ] as ChatCompletionRequestMessage[];
 
-  logger.log(JSON.stringify(messages, null, 2));
-
   const output = await createChatCompletion(messages, 400, 0);
   if (output === '') return [];
   let commandStrings: string[];

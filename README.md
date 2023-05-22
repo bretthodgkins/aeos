@@ -48,7 +48,7 @@ Alternatively, you may prefer to use Aeos Desktop (supports Mac OS, Windows and 
 
 <br>
 
-## Usage
+## Quick Start
 
 Here's a simple guide on how to use Aeos CLI:
 
@@ -56,26 +56,68 @@ Here's a simple guide on how to use Aeos CLI:
 # List all commands
 aeos commands
 
-# Run specific commands OR use natural language
+# Run specific commands OR describe what you want in natural language, and it will map to valid commands
 aeos run <commands...>
+
+# Install a plugin (npm package name or local directory)
+aeos install <plugin>
 
 # List all plugins
 aeos plugins
 
-# Install a plugin
-aeos install <plugin>
-
-# Uninstall a plugin
-aeos uninstall <plugin>
+# See manual for detailed documentation
+aeos help
 ```
-
-The above commands are basic ways to use Aeos. For more advanced usage, please refer to the full documentation.
 
 <br>
 
+## Develop your own plugins
+
+Creating a new plugin is easy! Simply clone and modify the [Aeos Plugin Template](https://github.com/bretthodgkins/aeos-plugin-template).
+
+```bash
+git clone git@github.com:bretthodgkins/aeos-plugin-template.git
+cd aeos-plugin-template
+npm install
+npm run build
+```
+
+You can install this working directory as an Aeos plugin whilst in development:
+
+```bash
+aeos install .
+```
+
+After that, you can start adding functionality to your plugin.
+
+<br>
+
+## Publishing Your Plugin
+
+Aeos supports the installation of plugins directly from npm, which simplifies the publishing and distribution process. Follow these steps to publish your plugin:
+
+1. Ensure that you have an npm account and that you're logged into npm in your development environment. If you haven't, you can create an account on the [npm website](https://www.npmjs.com/).
+
+2. In your plugin directory, make sure your `package.json` file is properly set up. Particularly, verify that the `name`, `version`, and `main` properties are correctly defined.
+
+3. Once your `package.json` file is ready and your code is finalised, you can publish your plugin to npm using the `npm publish` command:
+
+```bash
+npm publish
+```
+
+4. After publishing, your plugin will be available in the npm registry and can be installed by anyone using the following Aeos command:
+
+```bash
+aeos install <your-package-name>
+```
+
+<br>
+
+
 ## Contributing
 
-Contributions to the Aeos project are welcome! Whether it's reporting bugs, discussing improvements and new ideas, or direct contributions via pull requests, we appreciate your help.
+Contributions to Aeos are welcome! Whether it's reporting bugs, discussing improvements and new ideas, or direct contributions via pull requests, we appreciate your help.
 
 See the [CONTRIBUTING.md](CONTRIBUTING.md) file for more details.
 
