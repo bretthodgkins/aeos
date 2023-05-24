@@ -2,6 +2,7 @@
 require('dotenv').config()
 
 import { Command } from 'commander';
+import * as packageJson from '../package.json';
 
 import store from './store';
 import logger from './logger';
@@ -21,7 +22,7 @@ async function main() {
   const program = new Command();
 
   program
-    .version('1.1.0')
+    .version(packageJson.version)
     .option('-d, --debug', 'enable debug console logs')
     .option('-l, --log', 'enable debug logging to file')
 

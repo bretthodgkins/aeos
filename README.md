@@ -41,8 +41,13 @@ It also supports a robust plugin system which adds capabilities such as computer
 This repo provides a Command-Line Interface which can be easily installed globally with npm:
 
 ```bash
-npm install -g bhodgk/aeos
+npm install -g @bhodgk/aeos
 ```
+
+You will also need to set the following environmnet variables:
+* OPENAI_ORG_ID: An OpenAI Organisation token
+* OPENAI_API_KEY: An OpenAI API key
+
 
 Alternatively, you may prefer to use Aeos Desktop (supports Mac OS, Windows and Linux) or Aeos In Notion (schedule + monitor many agents)
 

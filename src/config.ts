@@ -6,8 +6,8 @@ import JSON5 from 'json5';
 
 const defaultConfig = {
   configuration: {
-    enableLogToConsole: false, // enables debug logs
-    enableLogToFile: false, // writes debug logs to ./access.log
+    enableLogToConsole: true, // enables debug logs
+    enableLogToFile: true, // writes debug logs to ./access.log
   },
   userVariables: {
     // key value pairs that will be available on startup
@@ -18,8 +18,8 @@ const defaultConfig = {
 };
 
 type ConfigType = {
-  configuration: Record<string, string>;
-  userVariables: Record<string, string>;
+  configuration: Record<string, any>;
+  userVariables: Record<string, any>;
   plugins: string[];
 }
 
@@ -35,7 +35,7 @@ class Config {
   }
 
   getConfigDirectory(): string {
-    let dir = '';
+    let configDir = '';
 
     // Check the operating system
     if (process.platform === 'win32') {
@@ -45,19 +45,41 @@ class Config {
         process.exit(1);
       }
 
-      dir = path.join(process.env.APPDATA, 'aeos');
+      configDir = path.join(process.env.APPDATA, 'aeos');
     } else {
       // On Linux/Mac, use a dotfile in the home directory
-      dir = path.join(os.homedir(), '.aeos');
+      configDir = path.join(os.homedir(), '.aeos');
     }
 
     // Ensure the directory exists
-    fs.mkdirSync(dir, { recursive: true });
-    return dir;
+    fs.mkdirSync(configDir, { recursive: true });
+    return configDir;
   }
 
   getConfigPath(): string {
     return path.join(this.getConfigDirectory(), 'config.json5');
+  }
+
+  getCommandsDirectory(): string {
+    const commandsDir = path.join(this.getConfigDirectory(), 'commands');
+
+    // Ensure the directory exists
+    fs.mkdirSync(commandsDir, { recursive: true });
+
+    return commandsDir;
+  }
+
+  getLogPath(): string {
+    return path.join(this.getConfigDirectory(), 'access.log');
+  }
+
+  getPluginsDirectory(): string {
+    const pluginDir = path.join(this.getConfigDirectory(), 'plugins');
+
+    // Ensure the directory exists
+    fs.mkdirSync(pluginDir, { recursive: true });
+
+    return pluginDir;
   }
 
   loadConfig(): void {

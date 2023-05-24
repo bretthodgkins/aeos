@@ -1,6 +1,3 @@
-import fs from 'fs';
-import JSON5 from 'json5';
-
 import { 
   CommandInput, 
   getCommandInputString, 
@@ -10,22 +7,20 @@ import {
 import config from './config';
 
 class Store {
-  private store: Record<string, string>;
+  private store: Record<string, any>;
 
   constructor() {
     this.store = {
-      'enableLogToConsole': 'false',
-      'enableLogToFile': 'false',
       ...config.getConfiguration(),
       ...config.getUserVariables(),
     };
   }
 
-  addMapToStore(map: Record<string, string>) {
+  addMapToStore(map: Record<string, any>) {
     this.store = { ...this.store, ...map };
   }
 
-  addKeyValueToStore(key: string, value: string) {
+  addKeyValueToStore(key: string, value: any) {
     this.store[key] = value;
   }
 
@@ -36,7 +31,7 @@ class Store {
     return args.reduce((result, arg) => {
       const value = this.store[arg.slice(2, -1)];
       if (!value) throw new Error(`Unable to find value for ${arg} in store`);
-      result = result.replace(arg, value);
+      result = result.replace(arg, value.toString());
       return result;
     }, input);
   }
@@ -47,7 +42,7 @@ class Store {
     return setCommandInputString(commandInput, newCommandString);
   }
 
-  getValue(key: string): string | undefined {
+  getValue(key: string): any {
     return this.store[key];
   }
 }

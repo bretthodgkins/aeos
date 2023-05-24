@@ -14,12 +14,6 @@ class PluginManager {
     this.plugins = new Map<string, AeosPlugin>();
   }
 
-  getPluginsDirectory(): string {
-    const pluginDir = path.join(config.getConfigDirectory(), 'plugins');
-    fs.mkdirSync(pluginDir, { recursive: true });
-    return pluginDir;
-  }
-
   async loadPlugins(): Promise<void> {
     const pluginsList = config.getPluginsList();
     for (const plugin of pluginsList) {
@@ -33,7 +27,7 @@ class PluginManager {
         if (fs.existsSync(input)) {
           pluginModule = await import(input);
         } else {
-          pluginModule = await import(path.join(this.getPluginsDirectory(), 'node_modules', input));
+          pluginModule = await import(path.join(config.getPluginsDirectory(), 'node_modules', input));
         }
         const plugin = pluginModule.default as AeosPlugin;
         this.plugins.set(input, plugin);
@@ -65,12 +59,12 @@ class PluginManager {
       // Assume input is an npm package
       try {
         // Check if this package is already installed
-        require.resolve(path.join(this.getPluginsDirectory(), 'node_modules', input));
+        require.resolve(path.join(config.getPluginsDirectory(), 'node_modules', input));
         // continue to add plugin to config
       } catch {
         // If not, try to install it
         try {
-          execSync(`npm install --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+          execSync(`npm install --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
           console.error(`\nFailed to install plugin ${input}`);
           return;
@@ -93,10 +87,10 @@ class PluginManager {
     if (fs.existsSync(fullPath)) {
       config.removePlugin(fullPath);
     } else {
-      const installedPath = path.join(this.getPluginsDirectory(), 'node_modules', input);
+      const installedPath = path.join(config.getPluginsDirectory(), 'node_modules', input);
       if (fs.existsSync(installedPath)) {
         try {
-          execSync(`npm uninstall --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+          execSync(`npm uninstall --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
           console.error(`\nEncountered error while uninstalling plugin ${input}`);
         }
@@ -120,10 +114,10 @@ class PluginManager {
       console.log(`Plugin "${input}" is a local plugin. Please update manually.`);
       return;
     } else {
-      const installedPath = path.join(this.getPluginsDirectory(), 'node_modules', input);
+      const installedPath = path.join(config.getPluginsDirectory(), 'node_modules', input);
       if (fs.existsSync(installedPath)) {
         try {
-          execSync(`npm update --prefix ${this.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
+          execSync(`npm update --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
           console.error(`\nEncountered error while updating plugin ${input}`);
         }

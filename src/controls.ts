@@ -179,7 +179,7 @@ export async function downloadFromURL(args: Record<string, string>): Promise<Com
   }
   
   const fileName = args.filename.replace(/\s/g,'-').toLowerCase();
-  const filePath = path.join(__dirname, `../output/${fileName}`);
+  const filePath = path.join(__dirname, '..', 'output', `${fileName}`);
 
   request(args.url)
     .pipe(fs.createWriteStream(filePath))

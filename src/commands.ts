@@ -1,11 +1,12 @@
 import * as controls from './controls';
 import * as chatCompletion from './chatCompletion';
-import * as utils from './utils';
 import * as flowControls from './flow_controls';
+import * as utils from './utils';
+import config from './config';
 import logger from "./logger";
 import notifications from './notifications';
-import store from './store';
 import pluginManager from './pluginManager';
+import store from './store';
 
 import { 
   Command,
@@ -18,6 +19,7 @@ import {
 } from './command_types';
 
 const fs = require('fs');
+const path = require('path');
 const JSON5 = require('json5')
 
 let isInterrupted = false;
@@ -165,21 +167,21 @@ function getUserCommandsFromFile(path: string): Command[] {
 function getUserCommands(): Command[] {
   let commandList: Command[] = [];
 
-
   let files: any;
+  const commandsDir = config.getCommandsDirectory();
   try {
-    files = fs.readdirSync('./commands');
+    files = fs.readdirSync(commandsDir);
   } catch(e: any) {
-    logger.log(`Warning: Commands directory not found at ./commands`);
+    logger.log(`Warning: Commands directory not found at ${commandsDir}`);
     return [];
   }
-
 
   // Loop through the list of files
   for (const file of files) {
     // Check if the file is a JSON file
     if (file.endsWith('.json') || file.endsWith('.json5')) {
-      commandList = commandList.concat(getUserCommandsFromFile(`./commands/${file}`));
+      const filePath = path.join(commandsDir, file);
+      commandList = commandList.concat(getUserCommandsFromFile(filePath));
     }
   }
 
@@ -187,10 +189,7 @@ function getUserCommands(): Command[] {
 }
 
 
-let allCommands = [
-  ...controlCommands,
-  ...getUserCommands(),
-];
+let allCommands = [] as Command[];
 
 export function loadAllCommands() {
   const userCommands = getUserCommands();
@@ -200,9 +199,9 @@ export function loadAllCommands() {
     ...userCommands,
     ...pluginCommands,
   ];
-  logger.log(`Loaded ${controlCommands.length} native commands`);
-  logger.log(`Loaded ${pluginCommands.length} commands from plugins`);
-  logger.log(`Loaded ${userCommands.length} user-defined commands`);
+  logger.log(`Loaded ${controlCommands.length} native command${controlCommands.length === 1 ? '' : 's'}`);
+  logger.log(`Loaded ${pluginCommands.length} command${pluginCommands.length === 1 ? '' : 's'} from plugins`);
+  logger.log(`Loaded ${userCommands.length} user-defined command${userCommands.length === 1 ? '' : 's'}`);
 }
 
 
