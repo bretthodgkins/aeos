@@ -48,16 +48,13 @@ export async function waitInSeconds(args: Record<string, string>): Promise<Comma
       message: 'No valid duration provided',
     };
   }
+
   const sleep = (milliseconds: number) => {
-    return new Promise(resolve => setTimeout(resolve, milliseconds))
-  }
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+  };
+  
+  await sleep(Number(args.duration) * 1000);
 
-  const waitPromise = async () => {
-    await sleep((parseInt(args.duration) * 1000));
-  }
-
-  logger.log(`Waiting for ${args.duration} seconds...`);
-  await waitPromise();
   logger.log(`Finished waiting`);
   return { success: true } as CommandResult;
 }
@@ -69,16 +66,13 @@ export async function waitInMilliseconds(args: Record<string, string>): Promise<
       message: 'No valid duration provided',
     };
   }
+
   const sleep = (milliseconds: number) => {
-    return new Promise(resolve => setTimeout(resolve, milliseconds))
-  }
-
-  const waitPromise = async () => {
-    await sleep(parseInt(args.duration));
-  }
-
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+  };
+  
   logger.log(`Waiting for ${args.duration} milliseconds...`);
-  await waitPromise();
+  await sleep(Number(args.duration));
   logger.log(`Finished waiting`);
   return { success: true } as CommandResult;
 }
