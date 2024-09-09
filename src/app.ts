@@ -13,11 +13,19 @@ import {
   loadAllCommands,
   runCommands,
 } from './commands';
+
+import { 
+  loadAllTasks,
+  createTaskAndSubtasks,
+  continuePlanning,
+} from './tasks';
+
 import AeosPlugin from './pluginInterface';
 
 async function main() {
   await pluginManager.loadPlugins();
   loadAllCommands();
+  loadAllTasks();
 
   const program = new Command();
 
@@ -57,6 +65,48 @@ async function main() {
         logger.log(`Commands resolved successfully`);
       } else {
         logger.log(`Commands failed. ${result.message}`);
+      }
+    });
+
+  program
+    .command('create-task <description>')
+    .description('describe a new task to start planning for')
+    .action(async (description) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const result = await createTaskAndSubtasks(description);
+    
+      if (result) {
+        logger.log(`Task resolved successfully`);
+      } else {
+        logger.log(`Task failed.`);
+      }
+    });
+
+  program
+    .command('continue-planning <name>')
+    .description('specify a task to continue planning')
+    .action(async (name) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const result = await continuePlanning(name);
+    
+      if (result) {
+        logger.log(`Task resolved successfully`);
+      } else {
+        logger.log(`Task failed.`);
       }
     });
 

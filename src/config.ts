@@ -69,6 +69,15 @@ class Config {
     return commandsDir;
   }
 
+  getTasksDirectory(): string {
+    const tasksDir = path.join(this.getConfigDirectory(), 'tasks');
+
+    // Ensure the directory exists
+    fs.mkdirSync(tasksDir, { recursive: true });
+
+    return tasksDir;
+  }
+
   getLogPath(): string {
     return path.join(this.getConfigDirectory(), 'access.log');
   }
