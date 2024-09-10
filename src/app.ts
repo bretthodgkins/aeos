@@ -15,11 +15,11 @@ import {
 } from './commands';
 
 import { 
-  loadAllTasks,
-  createTaskAndSubtasks,
+  loadAllPlans,
+  createPlanAndTasks,
   continuePlanning,
   getTreeStructure,
-  findTask,
+  findPlan,
 } from './tasks';
 
 import AeosPlugin from './pluginInterface';
@@ -27,7 +27,7 @@ import AeosPlugin from './pluginInterface';
 async function main() {
   await pluginManager.loadPlugins();
   loadAllCommands();
-  loadAllTasks();
+  loadAllPlans();
 
   const program = new Command();
 
@@ -71,7 +71,7 @@ async function main() {
     });
 
   program
-    .command('create-task <description>')
+    .command('plan <description>')
     .description('describe a new task to start planning for')
     .action(async (description) => {
       if (program.opts().debug) {
@@ -82,7 +82,7 @@ async function main() {
         store.addKeyValueToStore('enableLogToFile', 'true');
       }
 
-      const result = await createTaskAndSubtasks(description);
+      const result = await createPlanAndTasks(description);
     
       if (result) {
         logger.log(`Task resolved successfully`);
@@ -92,9 +92,9 @@ async function main() {
     });
 
   program
-    .command('continue-planning <name>')
-    .description('specify a task to continue planning')
-    .action(async (name) => {
+    .command('continue <planName>')
+    .description('specify a plan to continue planning')
+    .action(async (planName) => {
       if (program.opts().debug) {
         store.addKeyValueToStore('enableLogToConsole', 'true');
       }
@@ -103,33 +103,38 @@ async function main() {
         store.addKeyValueToStore('enableLogToFile', 'true');
       }
 
-      const result = await continuePlanning(name);
-    
-      if (result) {
-        logger.log(`Task resolved successfully`);
-      } else {
-        logger.log(`Task failed.`);
-      }
-    });
-
-  program
-    .command('tree <taskName>')
-    .description('log the tree structure of a task')
-    .action(async (taskName) => {
-      if (program.opts().debug) {
-        store.addKeyValueToStore('enableLogToConsole', 'true');
-      }
-
-      if (program.opts().log) {
-        store.addKeyValueToStore('enableLogToFile', 'true');
-      }
-
-      const task = findTask(taskName);
-      if (!task) {
-        logger.log(`Task ${taskName} not found`);
+      const plan = findPlan(planName);
+      if (!plan) {
+        logger.log(`Plan ${planName} not found`);
         return;
       }
-      const tree = getTreeStructure(task);
+      const result = await continuePlanning(plan);
+    
+      if (result) {
+        logger.log(`Task resolved successfully`);
+      } else {
+        logger.log(`Task failed.`);
+      }
+    });
+
+  program
+    .command('tree <planName>')
+    .description('log the tree structure of a task')
+    .action(async (planName) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const plan = findPlan(planName);
+      if (!plan) {
+        logger.log(`Plan ${planName} not found`);
+        return;
+      }
+      const tree = getTreeStructure(plan);
       console.log(tree);
     });
 

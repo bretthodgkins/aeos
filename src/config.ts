@@ -69,13 +69,13 @@ class Config {
     return commandsDir;
   }
 
-  getTasksDirectory(): string {
-    const tasksDir = path.join(this.getConfigDirectory(), 'tasks');
+  getPlansDirectory(): string {
+    const plansDir = path.join(this.getConfigDirectory(), 'plans');
 
     // Ensure the directory exists
-    fs.mkdirSync(tasksDir, { recursive: true });
+    fs.mkdirSync(plansDir, { recursive: true });
 
-    return tasksDir;
+    return plansDir;
   }
 
   getLogPath(): string {
