@@ -15,12 +15,13 @@ import notifications from './notifications';
 
 type Task = {
   name: string;
+  feasibility?: number;
   objective: string;
   subtasks: Subtask[];
 };
 
 type Subtask = {
-  description: string;
+  objective: string;
   impact: number;
   impactRationale: string;
   feasibility: number;
@@ -79,24 +80,45 @@ Your specific task is to analyze a user-provided high-level objective and break 
 
 For each subtask, you must provide:
 
-1. A clear description of the task.
-2. An impact score: A number between 0-100 representing an estimate percentage toward completing the overall objective. The combined sum of all subtask scores should not exceed 100, but could be less if there could be additional work required.
+1. A clear objective statement for the task.
+2. An impact score: A number between 0 and 1 representing an estimate percentage toward completing the overall objective. The combined sum of all subtask scores should not exceed 1, but could be less if there could be additional work required.
 3. An impact rationale: A brief explanation justifying the assigned impact score.
-4. A feasibility score: A number between 0-100 representing the likelihood that this AI agent could complete the task independently, considering its current capabilities and the potential to write new ones. 
-   - 100: Task can be completed entirely by executing available commands.
-   - 51-99: Additional commands need to be written, but could technically be achieved by executing code without human intervention.
-   - 0-50: There are unknowns, further research is required, or human intervention is necessary.
+4. A feasibility score: A number between 0 and 1 representing the likelihood that this AI agent could complete the task independently, considering its current capabilities and the potential to write new ones. 
+   - 1: Task can be completed entirely by executing available commands.
+   - 0.7-0.9: Additional commands need to be written, but could technically be achieved by executing code without human intervention.
+   - 0.4-0.6: There are some unknowns or further research is required, but the task could potentially be completed without human intervention.
+   - 0.1-0.3: Significant unknowns exist or limited human intervention is likely necessary.
+   - 0: Any human input is required or there are significant unknowns.
 5. A feasibility rationale: A brief explanation justifying the assigned feasibility score.
 
 Remember:
 - This task is solely for creating subtasks with estimated scores and rationales. Do not attempt to prioritize tasks, execute them, or engage in conversation about them.
-- When estimating feasibility, consider both the current capabilities of the AI agent and its ability to write new capabilities as needed. Any task requiring human input or containing significant unknowns should score 50 or below.
+- When estimating feasibility, be highly conservative. Any task requiring human input or containing significant unknowns should score 0. If a subtask appears to be at least 3 steps away from an executable command, it should score very low (0.1-0.3).
+- The product of the subtask feasibility scores should roughly equal the feasibility score of the parent task. After assigning feasibility scores to subtasks, adjust the parent task's feasibility score to reflect this relationship.
 - Subtasks can encompass multiple actions and will be broken down further in subsequent steps.
 - Provide clear and concise rationales for both impact and feasibility scores to explain your reasoning.
-- Ensure that the total of all impact scores is less than 100, typically around 80-90, to account for unforeseen aspects of the project.
+- Ensure that the total of all impact scores is less than 1, typically around 0.8-0.9 to account for unforeseen aspects of the project.
 
 Your output will be processed by a separate tool, so focus on providing accurate and relevant information for each subtask as described above.
+
+
+Additional guidelines to reduce repetition and overlap:
+
+1. Ensure each subtask is unique and does not overlap with others. Avoid repeating objectives or creating subtasks that are too similar to one another.
+2. Use a hierarchical structure for subtasks, with more specific tasks nested under broader ones. This helps to organize related tasks without repetition.
+3. Consolidate similar or related tasks into a single, more comprehensive subtask when possible. This helps to reduce redundancy and create more meaningful task divisions.
+4. Each subtask should have a minimum impact score of 0.1. Tasks with lower impact should be combined with other related tasks or omitted if truly trivial.
+5. Before finalizing the task breakdown, review the entire structure to identify and eliminate any remaining repetitions or overlaps.
+
+Remember, the goal is to create a clear, concise, and non-repetitive task breakdown that effectively captures all necessary steps to achieve the main objective.
 `;
+
+const subtaskUserMessage = `
+Objective:  $OBJECTIVE
+
+Tree structure context:
+$TREE
+`; 
 
 let allTasks = [] as Task[];
 
@@ -248,7 +270,7 @@ async function createTask(description: string): Promise<Task> {
     role: 'user',
     content: description,
   };
-  const functionCall = await callFunction(taskSystemMessage, [userMessage], [functionDefinition]);
+  const functionCall = await callFunction(taskSystemMessage, [userMessage], [functionDefinition], functionDefinition.name);
   return {
     name: functionCall.input.name,
     objective: functionCall.input.objective,
@@ -256,7 +278,7 @@ async function createTask(description: string): Promise<Task> {
   };
 }
 
-async function createSubtasks(task: Task): Promise<Subtask[]> {
+async function createSubtasks(task: Task | Subtask, tree: string): Promise<Subtask[]> {
   const functionDefinition: FunctionDefinition = {
     name: 'createSubtasks',
     description: 'A tool used to generate a list of subtasks for a given high-level objective. It breaks down the main objective into smaller, manageable tasks and provides impact and feasibility assessments for each.',
@@ -267,13 +289,13 @@ async function createSubtasks(task: Task): Promise<Subtask[]> {
         items: {
           type: 'object',
           properties: {
-            description: {
+            objective: {
               type: 'string',
-              description: 'A clear and concise explanation of the specific subtask to be accomplished.',
+              description: 'A clear and concise objective statement for the specific subtask to be accomplished.',
             },
             impact: {
               type: 'number',
-              description: 'A numerical score between 0-100 representing the estimated percentage this subtask contributes towards completing the overall objective.',
+              description: 'A numerical score between 0-1 representing the estimated percentage this subtask contributes towards completing the overall objective.',
             },
             impactRationale: {
               type: 'string',
@@ -281,26 +303,28 @@ async function createSubtasks(task: Task): Promise<Subtask[]> {
             },
             feasibility: {
               type: 'number',
-              description: 'A numerical score between 0-100 representing the likelihood that the AI agent can complete this subtask independently, considering current capabilities and potential for writing new ones.',
+              description: 'A numerical score between 0-1 representing the likelihood that the AI agent can complete this subtask independently, considering current capabilities and potential for writing new ones.',
             },
             feasibilityRationale: {
               type: 'string',
               description: "A brief explanation justifying the assigned feasibility score, detailing why the task is considered more or less feasible based on the AI's current and potential capabilities.",
             },
           },
-          required: ['description', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale'],
+          required: ['objective', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale'],
         },
       },
     },
   };
+  const userMessageContent = subtaskUserMessage.replace('$OBJECTIVE', task.objective).replace('$TREE', tree);
+  console.log(userMessageContent);
   const userMessage: Message = {
     role: 'user',
-    content: task.objective,
+    content: userMessageContent,
   };
-  const functionCall = await callFunction(subtaskSystemMessage, [userMessage], [functionDefinition]);
+  const functionCall = await callFunction(subtaskSystemMessage, [userMessage], [functionDefinition], functionDefinition.name);
   return functionCall.input.subtasks.map((subtask: any) => { 
     return {
-      description: subtask.description,
+      objective: subtask.objective,
       impact: subtask.impact,
       impactRationale: subtask.impactRationale,
       feasibility: subtask.feasibility,
@@ -311,8 +335,26 @@ async function createSubtasks(task: Task): Promise<Subtask[]> {
   });
 }
 
-function findTask(taskName: string): Task | undefined {
+export function findTask(taskName: string): Task | undefined {
   return allTasks.find(task => task.name === taskName);
+}
+
+export function getTreeStructure(task: Task): string {
+  const lines = [] as string[];
+  function logSubtasks(subtasks: Subtask[], prefix: string = ''): void {
+    subtasks.forEach((subtask, index) => {
+      const depth = prefix.split('.').length;
+      const currentPrefix = prefix !== '' ? `${prefix}.${index + 1}` : `${index + 1}`;
+      lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective}`);
+      if (subtask.subtasks.length > 0) {
+        logSubtasks(subtask.subtasks, currentPrefix);
+      }
+    });
+  }
+
+  lines.push(`${task.objective}`);
+  logSubtasks(task.subtasks, '');
+  return lines.join('\n');
 }
 
 function findLeastFeasibleSubtask(task: Task): Subtask | undefined {
@@ -333,9 +375,29 @@ function findLeastFeasibleSubtask(task: Task): Subtask | undefined {
   return leastFeasibleSubtask;
 }
 
+function calculateFeasibility(subtasks: Subtask[]): number {
+  if (subtasks.length === 0) {
+    return 1; // Return 1 (fully feasible) if there are no subtasks
+  }
+
+  let weightedProduct = 1;
+  let totalImpact = 0;
+
+  for (const subtask of subtasks) {
+    const impact = Math.max(subtask.impact, 0.0001); // Avoid zero impact
+    const feasibility = Math.max(subtask.feasibility, 0.0001); // Avoid zero feasibility
+
+    weightedProduct *= Math.pow(feasibility, impact);
+    totalImpact += impact;
+  }
+
+  return Math.pow(weightedProduct, 1 / totalImpact);
+}
+
 export async function createTaskAndSubtasks(description: string): Promise<boolean> {
   const task = await createTask(description);
-  const subtasks = await createSubtasks(task);
+  const tree = getTreeStructure(task);
+  const subtasks = await createSubtasks(task, tree);
   task.subtasks = subtasks;
   allTasks.push(task);
   saveAllTasksToFile();
@@ -350,16 +412,31 @@ export async function continuePlanning(taskName: string): Promise<boolean> {
   }
 
   const leastFeasibleSubtask = findLeastFeasibleSubtask(task);
-  console.log(`Next subtask: ${leastFeasibleSubtask?.description}`);
+  if (!leastFeasibleSubtask) {
+    logger.log(`Error: No subtasks found for task: "${taskName}"`);
+    return false;
+  }
+
+  const parentTask = leastFeasibleSubtask?.parent;
+  if (!parentTask) {
+    logger.log(`Error: No parent task found for subtask: "${leastFeasibleSubtask.objective}"`);
+    return false;
+  }
+  console.log(`Primary objective: ${parentTask?.objective}`);
+  console.log(`Next subtask: ${leastFeasibleSubtask?.objective}`);
   console.log(`Feasibility: ${leastFeasibleSubtask?.feasibility}`);
   console.log(`Rationale: ${leastFeasibleSubtask?.feasibilityRationale}`);
 
-  const parentTask = leastFeasibleSubtask?.parent;
-  if (parentTask && 'objective' in parentTask) {
-    console.log(`Primary objective: ${parentTask.objective}`);
-  } else {
-    console.log(`Primary objective: ${parentTask?.description}`);
-  }
+  const tree = getTreeStructure(task);
+  const subtasks = await createSubtasks(leastFeasibleSubtask, tree);
+  leastFeasibleSubtask.subtasks = subtasks;
+
+  const revisedFeasibility = calculateFeasibility(leastFeasibleSubtask.subtasks);
+  console.log(`Previous feasibility: ${leastFeasibleSubtask?.feasibility}`);
+  console.log(`Revised feasibility: ${revisedFeasibility}`);
+
+  leastFeasibleSubtask.feasibility = revisedFeasibility;
+  saveAllTasksToFile();
 
   return true;
 }

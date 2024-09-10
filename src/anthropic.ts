@@ -31,15 +31,20 @@ async function createTools(functionDefinitions: FunctionDefinition[]) {
   });
 }
 
-export async function callFunction(systemMessage: string, messages: Message[], functionDefinitions: FunctionDefinition[]): Promise<FunctionCall> {
+export async function callFunction(systemMessage: string, messages: Message[], functionDefinitions: FunctionDefinition[], forceToolUse?: string): Promise<FunctionCall> {
   const anthropicMessages = await createMessages(messages);
   const anthropicTools = await createTools(functionDefinitions);
+  let toolChoice = { type: 'auto' } as any;
+  if (forceToolUse) {
+    toolChoice = { type: 'tool', name: forceToolUse};
+  }
   const message = await client.messages.create({
     model: 'claude-3-5-sonnet-20240620',
     max_tokens: 1024,
     system: systemMessage,
     messages: anthropicMessages,
     tools: anthropicTools,
+    tool_choice: toolChoice,
   });
   console.log('Initial response:');
   console.dir(message, { depth: 4 });

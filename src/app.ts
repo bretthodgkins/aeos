@@ -18,6 +18,8 @@ import {
   loadAllTasks,
   createTaskAndSubtasks,
   continuePlanning,
+  getTreeStructure,
+  findTask,
 } from './tasks';
 
 import AeosPlugin from './pluginInterface';
@@ -108,6 +110,27 @@ async function main() {
       } else {
         logger.log(`Task failed.`);
       }
+    });
+
+  program
+    .command('tree <taskName>')
+    .description('log the tree structure of a task')
+    .action(async (taskName) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const task = findTask(taskName);
+      if (!task) {
+        logger.log(`Task ${taskName} not found`);
+        return;
+      }
+      const tree = getTreeStructure(task);
+      console.log(tree);
     });
 
   program
