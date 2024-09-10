@@ -46,8 +46,6 @@ export async function callFunction(systemMessage: string, messages: Message[], f
     tools: anthropicTools,
     tool_choice: toolChoice,
   });
-  console.log('Initial response:');
-  console.dir(message, { depth: 4 });
 
   assert(message.stop_reason === 'tool_use');
 

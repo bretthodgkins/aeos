@@ -322,7 +322,6 @@ async function createSubtasks(objective: string, maxImpact: number, parent: Task
     },
   };
   const userMessageContent = taskUserMessage.replace('$OBJECTIVE', objective).replace('$TREE', tree);
-  console.log(userMessageContent);
   const userMessage: Message = {
     role: 'user',
     content: userMessageContent,
@@ -421,7 +420,7 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
     logger.log(`Error: No parent task found for subtask: "${leastFeasibleSubtask.objective}"`);
     return false;
   }
-  console.log(`Primary objective: ${parentTask?.objective}`);
+  console.log(`\n\nPrimary objective: ${plan.task?.objective}`);
   console.log(`Next subtask: ${leastFeasibleSubtask?.objective}`);
   console.log(`Feasibility: ${leastFeasibleSubtask?.feasibility}`);
   console.log(`Rationale: ${leastFeasibleSubtask?.feasibilityRationale}`);
@@ -431,11 +430,13 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
   leastFeasibleSubtask.subtasks = subtasks;
 
   const revisedFeasibility = calculateFeasibility(leastFeasibleSubtask.subtasks);
-  console.log(`Previous feasibility: ${leastFeasibleSubtask?.feasibility}`);
   console.log(`Revised feasibility: ${revisedFeasibility}`);
 
   leastFeasibleSubtask.feasibility = revisedFeasibility;
   saveAllPlansToFile();
+
+  const updatedTree = getTreeStructure(plan);
+  console.log(`\n\n${updatedTree}`);
 
   return true;
 }
