@@ -38,6 +38,7 @@ type Task = {
   impactRationale: string;
   feasibility: number;
   feasibilityRationale: string;
+  executionOrder?: number;
   subtasks: Task[];
   parent?: Task;
 };
@@ -221,6 +222,7 @@ async function createPlan(description: string, allRelevantCommands: string[]): P
       impactRationale: '',
       feasibility: 1,
       feasibilityRationale: '',
+      executionOrder: 1,
       objective: functionCall.input.objective,
       subtasks: [],
     }
@@ -272,8 +274,12 @@ Select the most appropriate category that best describes the task's characterist
               type: 'string',
               description: "A brief explanation justifying the assigned feasibility score, detailing why the task is considered more or less feasible based on the AI's current and potential capabilities.",
             },
+            executionOrder: {
+              type: 'number',
+              description: "The order in which the subtask should be executed, relative to the other subtasks on the same level. The first subtask should have an execution order of 1. If the subtask can be executed independently of other subtasks, order by impact.",
+            },
           },
-          required: ['objective', 'category', 'availableCommand', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale'],
+          required: ['objective', 'category', 'availableCommand', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale', 'executionOrder'],
         },
       },
     },
@@ -294,6 +300,7 @@ Select the most appropriate category that best describes the task's characterist
       impactRationale: subtask.impactRationale,
       feasibility: subtask.feasibility,
       feasibilityRationale: subtask.feasibilityRationale,
+      executionOrder: subtask.executionOrder,
       subtasks: [],
       parent,
     };
@@ -327,7 +334,19 @@ function isTaskComplete(task: Task): boolean {
   if (task.subtasks.length === 0) {
     return task.command !== undefined;
   }
-  return task.subtasks.every(subtask => isTaskComplete(subtask));
+  return task.subtasks.every(subtask => isTaskComplete(subtask) || isTaskBelowImpactThreshold(subtask));
+}
+
+function isTaskBelowImpactThreshold(task: Task): boolean {
+  const threshold = 0.1;
+
+  let impact = task.impact;
+  let parent = task.parent;
+  while (parent) {
+    impact *= parent.impact;
+    parent = parent.parent;
+  }
+  return impact < threshold;
 }
 
 function findLeastFeasibleIncompleteSubtask(task: Task): Task | undefined {
