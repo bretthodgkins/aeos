@@ -20,6 +20,7 @@ import {
   continuePlanning,
   getTreeStructure,
   findPlan,
+  savePlanAsCommand,
 } from './tasks';
 
 import AeosPlugin from './pluginInterface';
@@ -119,7 +120,7 @@ async function main() {
 
   program
     .command('tree <planName>')
-    .description('log the tree structure of a task')
+    .description('log the tree structure of a plan')
     .action(async (planName) => {
       if (program.opts().debug) {
         store.addKeyValueToStore('enableLogToConsole', 'true');
@@ -136,6 +137,32 @@ async function main() {
       }
       const tree = getTreeStructure(plan);
       console.log(tree);
+    });
+
+  program
+    .command('save <planName>')
+    .description('save plan as a task to be executed')
+    .action(async (planName) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const plan = findPlan(planName);
+      if (!plan) {
+        logger.log(`Plan ${planName} not found`);
+        return;
+      }
+      const result = await savePlanAsCommand(plan);
+
+      if (result) {
+        logger.log(`Task resolved successfully`);
+      } else {
+        logger.log(`Task failed.`);
+      }
     });
 
   program

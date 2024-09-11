@@ -164,6 +164,20 @@ function getUserCommandsFromFile(path: string): Command[] {
   return commandList;
 }
 
+export function saveCommandToFile(command: Command, filename: string) {
+  let commandJson = {
+    format: command.format,
+    type: command.type,
+    sequence: command.sequence,
+    requiresApplication: command.requiresApplication,
+    requiresExactMatch: command.requiresExactMatch,
+    examples: command.examples,
+  };
+  const commandsDir = config.getCommandsDirectory();
+  const filePath = path.join(commandsDir, filename);
+  fs.writeFileSync(filePath, JSON.stringify({ commands: [ commandJson ] }, null, 2));
+}
+
 function getUserCommands(): Command[] {
   let commandList: Command[] = [];
 

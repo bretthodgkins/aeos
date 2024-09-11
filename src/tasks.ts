@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const JSON5 = require('json5')
-import { callFunction } from "./anthropic";
+import { callFunction, createMessage } from "./anthropic";
 
 import {
   FunctionCall,
@@ -11,15 +11,29 @@ import {
 import config from './config';
 import logger from "./logger";
 import notifications from './notifications';
+import { promptCreatePlan, promptCreateSubtasks, promptFindCommandsRelevantToObjective } from "./taskPrompts";
+import { getAllCommandFormats, saveCommandToFile } from "./commands";
+import { Command, CommandInput, CommandType } from "./command_types";
 
 
 type Plan = {
   name: string;
   task: Task;
+  additionalInfoNeeded: string;
 };
+
+enum TaskCategory {
+  Discrete = "Discrete",
+  Sequence = "Sequence",
+  Manual = "Manual",
+  Complex = "Complex",
+  // Continuous = "Continuous"
+}
 
 type Task = {
   objective: string;
+  category: TaskCategory;
+  command?: string;
   impact: number;
   impactRationale: string;
   feasibility: number;
@@ -28,95 +42,6 @@ type Task = {
   parent?: Task;
 };
 
-const planSystemMessage = `
-You are an AI assistant specialized in task analysis and definition. Your role is to take a user-provided description of a task and transform it into a clear, actionable objective statement along with a concise task name.
-
-Your responsibilities include:
-
-1. Analyzing the user's task description to understand the core purpose and desired outcome.
-
-2. Formulating a well-defined, actionable objective statement that:
-   - Clearly states the goal
-   - Is specific and measurable
-   - Is achievable and realistic
-   - Is relevant to the user's intent
-   - Includes a time frame or deadline if applicable
-
-3. Creating a short, descriptive task name that:
-   - Succinctly captures the essence of the task
-   - Is easily identifiable and memorable
-   - Is suitable for use in task management systems or automation platforms
-
-4. Ensuring that both the objective statement and task name are:
-   - Free of ambiguity
-   - Aligned with the user's original intent
-   - Actionable and clear for both human users and AI systems
-
-Remember:
-- Focus solely on defining the task and creating the objective statement and task name. Do not attempt to execute the task or provide additional information beyond what is requested.
-- If the user's description lacks crucial information, state what additional details are needed to create a comprehensive objective statement.
-- Ensure that the objective statement and task name are general enough to be understood by various systems or individuals, but specific enough to guide task execution.
-
-Your output will be used to initiate task execution in various systems, so clarity and accuracy are paramount."
-`;
-
-const taskSystemMessage = `
-You are an LLM inside an open-source AI automation platform that harnesses the power of Large Language Models (LLMs) to build and run complex automations.
-
-The platform is highly extendible, allowing users to create their own automations and provide examples of them being called using natural language. It supports a robust plugin system which adds capabilities such as:
-
-- Computer vision
-- OCR
-- Image recognition
-- Browser automation
-- GUI automation
-- Integrations with popular applications (e.g., Google Sheets, Google Drive, Notion, Slack, Hubspot, AWS, and many more)
-
-The AI agents on the platform can create their own plans to achieve objectives. These plans can involve writing and deploying code to expand available capabilities, as well as collaborating with human users if assistance is needed.
-
-Your specific task is to analyze a user-provided high-level objective and break it down into smaller, more manageable subtasks. Each subtask should be clearly defined and have a specific purpose.
-
-For each subtask, you must provide:
-
-1. A clear objective statement for the task.
-2. An impact score: A number between 0 and 1 representing an estimate percentage toward completing the overall objective. The combined sum of all subtask scores should not exceed 1, but could be less if there could be additional work required.
-3. An impact rationale: A brief explanation justifying the assigned impact score.
-4. A feasibility score: A number between 0 and 1 representing the likelihood that this AI agent could complete the task independently, considering its current capabilities and the potential to write new ones. 
-   - 1: Task can be completed entirely by executing available commands.
-   - 0.7-0.9: Additional commands need to be written, but could technically be achieved by executing code without human intervention.
-   - 0.4-0.6: There are some unknowns or further research is required, but the task could potentially be completed without human intervention.
-   - 0.1-0.3: Significant unknowns exist or limited human intervention is likely necessary.
-   - 0: Any human input is required or there are significant unknowns.
-5. A feasibility rationale: A brief explanation justifying the assigned feasibility score.
-
-Remember:
-- This task is solely for creating subtasks with estimated scores and rationales. Do not attempt to prioritize tasks, execute them, or engage in conversation about them.
-- When estimating feasibility, be highly conservative. Any task requiring human input or containing significant unknowns should score 0. If a subtask appears to be at least 3 steps away from an executable command, it should score very low (0.1-0.3).
-- The product of the subtask feasibility scores should roughly equal the feasibility score of the parent task. After assigning feasibility scores to subtasks, adjust the parent task's feasibility score to reflect this relationship.
-- Subtasks can encompass multiple actions and will be broken down further in subsequent steps.
-- Provide clear and concise rationales for both impact and feasibility scores to explain your reasoning.
-- Ensure that the total of all impact scores is less than 1, typically around 0.8-0.9 to account for unforeseen aspects of the project.
-
-Your output will be processed by a separate tool, so focus on providing accurate and relevant information for each subtask as described above.
-
-
-Additional guidelines to reduce repetition and overlap:
-
-1. Ensure each subtask is unique and does not overlap with others. Avoid repeating objectives or creating subtasks that are too similar to one another.
-2. Use a hierarchical structure for subtasks, with more specific tasks nested under broader ones. This helps to organize related tasks without repetition.
-3. Consolidate similar or related tasks into a single, more comprehensive subtask when possible. This helps to reduce redundancy and create more meaningful task divisions.
-4. Each subtask should have a minimum impact score of 0.1. Tasks with lower impact should be combined with other related tasks or omitted if truly trivial.
-5. Before finalizing the task breakdown, review the entire structure to identify and eliminate any remaining repetitions or overlaps.
-
-Remember, the goal is to create a clear, concise, and non-repetitive task breakdown that effectively captures all necessary steps to achieve the main objective.
-`;
-
-const taskUserMessage = `
-Objective:  $OBJECTIVE
-
-Tree structure context:
-$TREE
-`; 
 
 let allPlans = [] as Plan[];
 
@@ -189,6 +114,7 @@ function getUserPlansFromFile(path: string): Plan[] {
     planList.push({
       name,
       task: inputPlan.task,
+      additionalInfoNeeded: inputPlan.additionalInfoNeeded || '',
       // requiresApplication: requiresApplication,
       // requiresExactMatch: requiresExactMatch,
     });
@@ -251,7 +177,18 @@ function saveAllPlansToFile() {
   fs.writeFileSync(path.join(plansDirectory, 'default.json5'), JSON5.stringify({ plans: plansWithoutParents }, null, 2));
 }
 
-async function createPlan(description: string): Promise<Plan> {
+async function identifyRelevantCommands(objective: string): Promise<string[]> {
+  const allCommandFormats = getAllCommandFormats().sort();
+  const userMessage: Message = {
+    role: 'user',
+    content: promptFindCommandsRelevantToObjective(allCommandFormats, objective),
+  };
+  const message = await createMessage('', [userMessage]);
+  const commands = message.split('<relevant_commands>')[1].split('</relevant_commands>')[0].trim().split('\n');
+  return commands;
+}
+
+async function createPlan(description: string, allRelevantCommands: string[]): Promise<Plan> {
   const functionDefinition: FunctionDefinition = {
     name: 'createPlan',
     description: "The createPlan tool transforms a user-provided task description into a well-defined, actionable objective statement and a concise task plan name. This tool is designed to standardize task definitions, making them clear and executable for both human users and automated systems. It analyzes the user's input, extracts the core purpose, and formulates a structured output that can be easily integrated into task management systems or automation platforms.",
@@ -264,16 +201,22 @@ async function createPlan(description: string): Promise<Plan> {
         type: 'string',
         description: "A short, descriptive identifier for the plan. This concise name captures the essence of the plan in a few words, making it easily recognizable and referenceable. It's designed to be memorable and suitable for use in plan lists, project management tools, or when invoking the plan in automated systems.",
       },
+      additionalInfoNeeded: {
+        type: 'string',
+        description: "Provide a summary of any additional information required to refine the objective statement, otherwise, leave this field empty.",
+      },
     },
   };
   const userMessage: Message = {
     role: 'user',
-    content: description,
+    content: promptCreatePlan(description, allRelevantCommands),
   };
-  const functionCall = await callFunction(planSystemMessage, [userMessage], [functionDefinition], functionDefinition.name);
+  const functionCall = await callFunction('', [userMessage], [functionDefinition], functionDefinition.name);
   return {
     name: functionCall.input.name,
+    additionalInfoNeeded: functionCall.input.additionalInfoNeeded,
     task: {
+      category: TaskCategory.Complex,
       impact: 1,
       impactRationale: '',
       feasibility: 1,
@@ -284,7 +227,7 @@ async function createPlan(description: string): Promise<Plan> {
   };
 }
 
-async function createSubtasks(objective: string, maxImpact: number, parent: Task, tree: string): Promise<Task[]> {
+async function createSubtasks(objective: string, parent: Task, tree: string, allRelevantCommands: string[]): Promise<Task[]> {
   const functionDefinition: FunctionDefinition = {
     name: 'createSubtasks',
     description: 'A tool used to generate a list of subtasks for a given high-level objective. It breaks down the main objective into smaller, manageable tasks and provides impact and feasibility assessments for each.',
@@ -298,6 +241,20 @@ async function createSubtasks(objective: string, maxImpact: number, parent: Task
             objective: {
               type: 'string',
               description: 'A clear and concise objective statement for the specific subtask to be accomplished.',
+            },
+            category: {
+              type: 'string',
+              enum: ['discrete', 'sequence', 'manual', 'complex'],
+              description: `The classification of the task based on its nature and complexity. Choose from:
+- Discrete: A task achievable by executing a single, specific function or action.
+- Sequence: A task that could be achieved by executing a series of discrete functions with flow control.
+- Manual: A discrete task that would require a human or physical intervention and cannot be fully automated.
+- Complex: A multi-faceted task that can be broken down into subtasks of various categories.
+Select the most appropriate category that best describes the task's characteristics and requirements. If the task could not be achieved with a discrete action, or a simple script that combines discrete actions, consider it a complex task.`,
+            },
+            availableCommand: {
+              type: 'string',
+              description: 'An available command format that would achieve the subtask in its entirety. If the subtask would require any additional actions, leave this field empty.',
             },
             impact: {
               type: 'number',
@@ -316,21 +273,22 @@ async function createSubtasks(objective: string, maxImpact: number, parent: Task
               description: "A brief explanation justifying the assigned feasibility score, detailing why the task is considered more or less feasible based on the AI's current and potential capabilities.",
             },
           },
-          required: ['objective', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale'],
+          required: ['objective', 'category', 'availableCommand', 'impact', 'impactRationale', 'feasibility', 'feasibilityRationale'],
         },
       },
     },
   };
-  const userMessageContent = taskUserMessage.replace('$OBJECTIVE', objective).replace('$TREE', tree);
   const userMessage: Message = {
     role: 'user',
-    content: userMessageContent,
+    content: promptCreateSubtasks(objective, tree, allRelevantCommands),
   };
-  const functionCall = await callFunction(taskSystemMessage, [userMessage], [functionDefinition], functionDefinition.name);
+  const functionCall = await callFunction('', [userMessage], [functionDefinition], functionDefinition.name);
   return functionCall.input.subtasks.map((subtask: any) => { 
     return {
       objective: subtask.objective,
-      impact: subtask.impact * maxImpact,
+      category: subtask.category,
+      command: subtask.availableCommand && subtask.availableCommand.trim() !== '' ? subtask.availableCommand : undefined,
+      impact: subtask.impact,
       impactRationale: subtask.impactRationale,
       feasibility: subtask.feasibility,
       feasibilityRationale: subtask.feasibilityRationale,
@@ -349,13 +307,14 @@ export function getTreeStructure(plan: Plan): string {
   function logSubtasks(subtasks: Task[], prefix: string, depth: number): void {
     subtasks.forEach((subtask, index) => {
       const currentPrefix = depth > 1 ? `${prefix}.${index + 1}` : `${index + 1}`;
-      lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective}`);
+      lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective} (${subtask.category})`);
       if (subtask.subtasks.length > 0) {
         logSubtasks(subtask.subtasks, currentPrefix, depth + 1);
       }
     });
   }
 
+  lines.push(`Plan: ${plan.name}`);
   lines.push(`${plan.task.objective}`);
   logSubtasks(plan.task.subtasks, '', 1);
   return lines.join('\n');
@@ -399,12 +358,19 @@ function calculateFeasibility(tasks: Task[]): number {
 }
 
 export async function createPlanAndTasks(description: string): Promise<boolean> {
-  const plan = await createPlan(description);
+  const relevantCommands = await identifyRelevantCommands(description);
+  // console.log(`Relevant commands:\n${relevantCommands.join('\n')}`);
+
+  const plan = await createPlan(description, relevantCommands);
   const tree = getTreeStructure(plan);
-  const subtasks = await createSubtasks(plan.task.objective, 1, plan.task, tree);
+  const subtasks = await createSubtasks(plan.task.objective, plan.task, tree, relevantCommands);
   plan.task.subtasks = subtasks;
   allPlans.push(plan);
   saveAllPlansToFile();
+
+  const updatedTree = getTreeStructure(plan);
+  console.log(`\n\n${updatedTree}`);
+
   return true;
 }
 
@@ -425,8 +391,10 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
   console.log(`Feasibility: ${leastFeasibleSubtask?.feasibility}`);
   console.log(`Rationale: ${leastFeasibleSubtask?.feasibilityRationale}`);
 
+  const relevantCommands = await identifyRelevantCommands(leastFeasibleSubtask.objective);
+
   const tree = getTreeStructure(plan);
-  const subtasks = await createSubtasks(leastFeasibleSubtask.objective, leastFeasibleSubtask.impact, leastFeasibleSubtask, tree);
+  const subtasks = await createSubtasks(leastFeasibleSubtask.objective, leastFeasibleSubtask, tree, relevantCommands);
   leastFeasibleSubtask.subtasks = subtasks;
 
   const revisedFeasibility = calculateFeasibility(leastFeasibleSubtask.subtasks);
@@ -437,6 +405,39 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
 
   const updatedTree = getTreeStructure(plan);
   console.log(`\n\n${updatedTree}`);
+
+  return true;
+}
+
+export async function savePlanAsCommand(plan: Plan): Promise<boolean> {
+  // validate all leaf nodes have commands
+  const leafNodes = [] as Task[];
+  function findLeafNodes(task: Task): void {
+    if (task.subtasks.length === 0) {
+      leafNodes.push(task);
+    } else {
+      task.subtasks.forEach(subtask => findLeafNodes(subtask));
+    }
+  }
+  findLeafNodes(plan.task);
+
+  for (const leafNode of leafNodes) {
+    if (!leafNode.command) {
+      logger.log(`Error: No command found for subtask: "${leafNode.objective}"`);
+      return false;
+    }
+  }
+
+  // save plan as command
+  const newCommand = {
+    format: plan.name,
+    description: plan.task.objective,
+    type: CommandType.Sequence,
+    sequence: leafNodes.map(leafNode => leafNode.command) as CommandInput[],
+  } as Command;
+
+  const filename = plan.name.replace(/[^a-zA-Z0-9 ]/g, '').replace(/ /g, '-').replace(/\s/g, '').toLowerCase() + '.json5';
+  saveCommandToFile(newCommand, filename);
 
   return true;
 }

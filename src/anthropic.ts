@@ -31,6 +31,18 @@ async function createTools(functionDefinitions: FunctionDefinition[]) {
   });
 }
 
+export async function createMessage(systemMessage: string, messages: Message[]): Promise<string> {
+  const anthropicMessages = await createMessages(messages);
+  const message = await client.messages.create({
+    model: 'claude-3-5-sonnet-20240620',
+    max_tokens: 1024,
+    system: systemMessage,
+    messages: anthropicMessages,
+  }) as any;
+
+  return message.content[0].text;
+}
+
 export async function callFunction(systemMessage: string, messages: Message[], functionDefinitions: FunctionDefinition[], forceToolUse?: string): Promise<FunctionCall> {
   const anthropicMessages = await createMessages(messages);
   const anthropicTools = await createTools(functionDefinitions);
