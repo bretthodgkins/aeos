@@ -120,21 +120,21 @@ Using this information, break down the objective into smaller subtasks. For each
 6. Feasibility score (0-1)
 7. Feasibility rationale
 
-Follow these guidelines when creating subtasks:
-
-- Ensure each subtask is unique and does not overlap with others.
-- Consolidate similar or related tasks into a single, comprehensive subtask when possible.
-- An available command format that would achieve the subtask in its entirety. If the subtask would require any additional actions, leave this field empty.
-- Each subtask should have a minimum impact score of 0.1.
-- The total of all impact scores should be less than 1, typically around 0.8-0.9.
-- Be conservative when estimating feasibility scores.
-- Provide clear and concise rationales for both impact and feasibility scores.
+Guidelines:
+- Keep subtasks simple and directly related to the main objective.
+- Avoid creating unnecessary or overly complex subtasks.
+- Ensure each subtask is unique and contributes significantly to the main goal.
+- Use available commands when possible.
+- Total impact scores should sum to approximately 0.8-0.9.
+- Be realistic in feasibility assessments.
+- Provide brief, clear rationales for impact and feasibility scores.
+- Prioritize automation and avoid tasks requiring manual intervention.
+- Utilize LLMs for text generation, analysis, and decision-making tasks.
 
 Remember:
-- Focus solely on creating subtasks with estimated scores and rationales.
-- Do not attempt to prioritize tasks, execute them, or engage in conversation about them.
-- Provide clear and concise rationales for both impact and feasibility scores.
-- Ensure that the subtasks cover all aspects of the main objective without unnecessary repetition.
+- Focus only on creating relevant subtasks with scores and brief rationales.
+- Do not prioritize, execute, or discuss tasks beyond the breakdown.
+- Ensure subtasks cover all essential aspects of the main objective without redundancy.
 
 Begin your analysis now, and provide the subtask breakdown as specified above.
 `;

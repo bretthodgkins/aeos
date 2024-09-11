@@ -21,6 +21,8 @@ import {
   getTreeStructure,
   findPlan,
   savePlanAsCommand,
+  planAndExecute,
+  identifyRelevantCommands,
 } from './tasks';
 
 import AeosPlugin from './pluginInterface';
@@ -68,6 +70,44 @@ async function main() {
         logger.log(`Commands resolved successfully`);
       } else {
         logger.log(`Commands failed. ${result.message}`);
+      }
+    });
+
+  program
+    .command('related <objective>')
+    .description('find commands relevant to an objective')
+    .action(async (description) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const commands = await identifyRelevantCommands(description);
+      console.log(commands);
+    });
+
+
+  program
+    .command('objective <description>')
+    .description('plan and execute a new task to achieve an objective')
+    .action(async (description) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const result = await planAndExecute(description);
+    
+      if (result) {
+        logger.log(`Task resolved successfully`);
+      } else {
+        logger.log(`Task failed.`);
       }
     });
 

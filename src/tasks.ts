@@ -23,11 +23,11 @@ type Plan = {
 };
 
 enum TaskCategory {
-  Discrete = "Discrete",
-  Sequence = "Sequence",
-  Manual = "Manual",
-  Complex = "Complex",
-  // Continuous = "Continuous"
+  Discrete = 'discrete',
+  Sequence = 'sequence',
+  Manual = 'manual',
+  Complex = 'complex',
+  // Continuous = 'Continuous'
 }
 
 type Task = {
@@ -177,7 +177,7 @@ function saveAllPlansToFile() {
   fs.writeFileSync(path.join(plansDirectory, 'default.json5'), JSON5.stringify({ plans: plansWithoutParents }, null, 2));
 }
 
-async function identifyRelevantCommands(objective: string): Promise<string[]> {
+export async function identifyRelevantCommands(objective: string): Promise<string[]> {
   const allCommandFormats = getAllCommandFormats().sort();
   const userMessage: Message = {
     role: 'user',
@@ -284,10 +284,12 @@ Select the most appropriate category that best describes the task's characterist
   };
   const functionCall = await callFunction('', [userMessage], [functionDefinition], functionDefinition.name);
   return functionCall.input.subtasks.map((subtask: any) => { 
+    const command = subtask.availableCommand && subtask.availableCommand.trim() !== '' ? subtask.availableCommand : undefined;
+    const category = command ? TaskCategory.Discrete : subtask.category;
     return {
       objective: subtask.objective,
-      category: subtask.category,
-      command: subtask.availableCommand && subtask.availableCommand.trim() !== '' ? subtask.availableCommand : undefined,
+      category: category,
+      command: command,
       impact: subtask.impact,
       impactRationale: subtask.impactRationale,
       feasibility: subtask.feasibility,
@@ -307,7 +309,8 @@ export function getTreeStructure(plan: Plan): string {
   function logSubtasks(subtasks: Task[], prefix: string, depth: number): void {
     subtasks.forEach((subtask, index) => {
       const currentPrefix = depth > 1 ? `${prefix}.${index + 1}` : `${index + 1}`;
-      lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective} (${subtask.category})`);
+      // lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective}`);
+      lines.push(`${' '.repeat(depth)}${currentPrefix}. ${subtask.objective} (${subtask.command ? subtask.command : subtask.category})`);
       if (subtask.subtasks.length > 0) {
         logSubtasks(subtask.subtasks, currentPrefix, depth + 1);
       }
@@ -320,7 +323,16 @@ export function getTreeStructure(plan: Plan): string {
   return lines.join('\n');
 }
 
-function findLeastFeasibleSubtask(task: Task): Task {
+function isTaskComplete(task: Task): boolean {
+  if (task.subtasks.length === 0) {
+    return task.command !== undefined;
+  }
+  return task.subtasks.every(subtask => isTaskComplete(subtask));
+}
+
+function findLeastFeasibleIncompleteSubtask(task: Task): Task | undefined {
+  if (isTaskComplete(task)) return undefined;
+
   let leastFeasibleSubtask = task;
   let leastFeasibleScore = 1;
 
@@ -328,12 +340,15 @@ function findLeastFeasibleSubtask(task: Task): Task {
 
   while (subtasks.length > 0) {
     for (let subtask of subtasks) {
+      leastFeasibleScore = 1;
+      if (isTaskComplete(subtask)) continue;
       if (subtask.feasibility < leastFeasibleScore) {
         leastFeasibleScore = subtask.feasibility;
         leastFeasibleSubtask = subtask;
       }
     }
-    subtasks = leastFeasibleSubtask?.subtasks || [];
+
+    subtasks = leastFeasibleSubtask.subtasks || [];
   }
   return leastFeasibleSubtask;
 }
@@ -357,7 +372,23 @@ function calculateFeasibility(tasks: Task[]): number {
   return Math.pow(weightedProduct, 1 / totalImpact);
 }
 
-export async function createPlanAndTasks(description: string): Promise<boolean> {
+export async function planAndExecute(description: string): Promise<boolean> {
+  let plan = findPlan(description);
+  if (!plan) {
+    plan = await createPlanAndTasks(description);
+  }
+
+  while (!isTaskComplete(plan.task)) {
+    const result = await continuePlanning(plan);
+    if (!result) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function createPlanAndTasks(description: string): Promise<Plan> {
   const relevantCommands = await identifyRelevantCommands(description);
   // console.log(`Relevant commands:\n${relevantCommands.join('\n')}`);
 
@@ -371,36 +402,45 @@ export async function createPlanAndTasks(description: string): Promise<boolean> 
   const updatedTree = getTreeStructure(plan);
   console.log(`\n\n${updatedTree}`);
 
-  return true;
+  return plan;
 }
 
 export async function continuePlanning(plan: Plan): Promise<boolean> {
-  const leastFeasibleSubtask = findLeastFeasibleSubtask(plan.task);
-  if (!leastFeasibleSubtask) {
-    logger.log(`Error: No subtasks found for plan: "${plan.name}"`);
+  // Check for any incomplete manual tasks on the least feasible path
+
+  const nextTask = findLeastFeasibleIncompleteSubtask(plan.task);
+  if (!nextTask) {
+    logger.log(`Error: Can't find next task on incomplete plan: "${plan.name}"`);
     return false;
   }
+  console.log(`Next Task: ${nextTask?.objective}`);
+  console.log(`Feasibility: ${nextTask?.feasibility}`);
+  console.log(`Rationale: ${nextTask?.feasibilityRationale}`);
+  console.log(`Category: ${nextTask?.category}`);
 
-  const parentTask = leastFeasibleSubtask?.parent;
-  if (!parentTask) {
-    logger.log(`Error: No parent task found for subtask: "${leastFeasibleSubtask.objective}"`);
-    return false;
+  if (nextTask.category === TaskCategory.Manual) {
+    nextTask.command = `notification "Human Intervention Required" "Please help me complete the following task: ${nextTask.objective} ${nextTask.feasibilityRationale}"`;
+  } else if (nextTask.category !== TaskCategory.Complex) {
+    nextTask.command = `create command "${nextTask.objective}"`;
+  } else {
+    const parentTask = nextTask?.parent;
+    if (!parentTask) {
+      logger.log(`Error: No parent task found for subtask: "${nextTask.objective}"`);
+      return false;
+    }
+    const relevantCommands = await identifyRelevantCommands(nextTask.objective);
+
+    const tree = getTreeStructure(plan);
+    const subtasks = await createSubtasks(nextTask.objective, nextTask, tree, relevantCommands);
+    nextTask.subtasks = subtasks;
+
+    // TODO traverse the tree and update feasibility scores
+    const revisedFeasibility = calculateFeasibility(nextTask.subtasks);
+    console.log(`Revised feasibility: ${revisedFeasibility}`);
+
+    nextTask.feasibility = revisedFeasibility;
   }
-  console.log(`\n\nPrimary objective: ${plan.task?.objective}`);
-  console.log(`Next subtask: ${leastFeasibleSubtask?.objective}`);
-  console.log(`Feasibility: ${leastFeasibleSubtask?.feasibility}`);
-  console.log(`Rationale: ${leastFeasibleSubtask?.feasibilityRationale}`);
 
-  const relevantCommands = await identifyRelevantCommands(leastFeasibleSubtask.objective);
-
-  const tree = getTreeStructure(plan);
-  const subtasks = await createSubtasks(leastFeasibleSubtask.objective, leastFeasibleSubtask, tree, relevantCommands);
-  leastFeasibleSubtask.subtasks = subtasks;
-
-  const revisedFeasibility = calculateFeasibility(leastFeasibleSubtask.subtasks);
-  console.log(`Revised feasibility: ${revisedFeasibility}`);
-
-  leastFeasibleSubtask.feasibility = revisedFeasibility;
   saveAllPlansToFile();
 
   const updatedTree = getTreeStructure(plan);
