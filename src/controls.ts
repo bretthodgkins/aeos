@@ -262,7 +262,11 @@ export async function listFilesInDirectory(args: Record<string, string>): Promis
   }
 
   try {
-    const files = await fs.promises.readdir(args.directoryPath);
+    // const files = await fs.promises.readdir(args.directoryPath, {
+    //   encoding: 'utf8',
+    //   withFileTypes: false,
+    // });
+    const files: string[] = await fs.promises.readdir(args.directoryPath, { withFileTypes: false });
     store.addKeyValueToStore(args.variableName, files.join(', '));
     return { success: true };
   } catch (err: any) {
