@@ -1,8 +1,12 @@
-import { runCommands } from '../src/commands';
+import { loadAllCommands, runCommands } from '../src/commands';
 
 jest.setTimeout(100000); // 100 seconds
 
 describe('using gpt to predict commands', () => {
+  beforeAll(async () => {
+    await loadAllCommands();
+  });
+
   it('gpt can predict correct command', async () => {
     const commandInputs = [
       'can you please log "Test1" to the console',
@@ -29,6 +33,10 @@ describe('using gpt to predict commands', () => {
 });
 
 describe('specific commands', () => {
+  beforeAll(async () => {
+    await loadAllCommands();
+  });
+
   describe('try catch', () => {
     it('try catch supports invalid commands', async () => {
       const commandInputs = [

@@ -116,7 +116,7 @@ export async function generateText(prompt: string, maxTokens: number, temperatur
 
   try {
     const response = await openai.createCompletion({
-      model: "text-davinci-003",
+      model: "gpt-4o-mini",
       prompt: prompt,
       max_tokens: maxTokens,
       temperature: temperature,
@@ -124,7 +124,7 @@ export async function generateText(prompt: string, maxTokens: number, temperatur
     logger.log(JSON.stringify(response.data, null, 2));
 
     const outputString = response.data.choices[0].text as string;
-    logger.log(`Response: ${outputString}`);
+  logger.log(`Response: ${outputString}`);
     return outputString;
   } catch (e: any) {
     logger.log(`Unable to connect to OpenAI: ${e.message}`);

@@ -1,3 +1,4 @@
+import { evaluate } from 'mathjs';
 import * as fs from 'fs';
 
 import { Command, CommandType, CommandResult } from './command_types';
@@ -10,7 +11,17 @@ const flowControlMap = {
   'repeat ${x} times with index ${index}': repeatXTimesWithIndex,
   'for each line of ${filename}': forEachLineOfFile,
   'try': tryCatch,
-} as Record<string, (args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>) => Promise<CommandResult>>;
+  'if ${condition}': ifCondition,
+  'while ${condition}': whileCondition,
+  'for each ${itemVariable} in ${listVariable}': forEachItemInList,
+} as Record<
+  string,
+  (
+    args: Record<string, string>,
+    runSequence: () => Promise<CommandResult>,
+    runAlternativeSequence: () => Promise<CommandResult>
+  ) => Promise<CommandResult>
+>;
 
 export function getAllFlowControlFormats(): string[] {
   return Object.keys(flowControlMap);
@@ -22,13 +33,134 @@ export function getFlowControlFromFormat(format: string): Command {
       format,
       type: CommandType.Flow,
       flowControl: flowControlMap[format],
-    }
+    };
   }
 
   return {
     format,
     type: CommandType.Function,
+  };
+}
+
+function expandVariables(str: string): string {
+  return str.replace(/\$\{(\w+)\}/g, (match, variableName) => {
+    const value = store.getValue(variableName);
+    return value !== undefined ? String(value) : match;
+  });
+}
+
+
+export async function ifCondition(
+  args: Record<string, string>,
+  runSequence: () => Promise<CommandResult>,
+  runAlternativeSequence: () => Promise<CommandResult>
+): Promise<CommandResult> {
+  if (!args.condition) {
+    return {
+      success: false,
+      message: 'No condition provided',
+    };
   }
+
+  const conditionStr = expandVariables(args.condition);
+
+  let conditionResult;
+  try {
+    conditionResult = evaluate(conditionStr);
+  } catch (e) {
+    return {
+      success: false,
+      message: `Failed to evaluate condition: ${conditionStr}`,
+    };
+  }
+
+  if (conditionResult) {
+    const result = await runSequence();
+    if (!result.success) return result;
+  } else if (runAlternativeSequence) {
+    const result = await runAlternativeSequence();
+    if (!result.success) return result;
+  }
+
+  return { success: true } as CommandResult;
+}
+
+export async function whileCondition(
+  args: Record<string, string>,
+  runSequence: () => Promise<CommandResult>,
+  runAlternativeSequence: () => Promise<CommandResult>
+): Promise<CommandResult> {
+  if (!args.condition) {
+    return {
+      success: false,
+      message: 'No condition provided',
+    };
+  }
+
+  const conditionTemplate = args.condition;
+
+  while (true) {
+    const conditionStr = expandVariables(conditionTemplate);
+
+    let conditionResult;
+    try {
+      conditionResult = evaluate(conditionStr);
+    } catch (e: any) {
+      return {
+        success: false,
+        message: `Failed to evaluate condition: ${conditionStr} with error ${e.message}`,
+      };
+    }
+
+    // Ensure conditionResult is a boolean
+    if (typeof conditionResult !== 'boolean') {
+      // For comparison operations, mathjs should return a boolean.
+      // If it doesn't, we can convert numbers to booleans (0 => false, non-zero => true)
+      conditionResult = Boolean(conditionResult);
+    }
+
+    console.log(`Evaluating condition: ${conditionStr} => ${conditionResult}`);
+
+    if (!conditionResult) {
+      break;
+    }
+
+    const result = await runSequence();
+    if (!result.success) return result;
+  }
+
+  return { success: true } as CommandResult;
+}
+
+export async function forEachItemInList(
+  args: Record<string, string>,
+  runSequence: () => Promise<CommandResult>,
+  runAlternativeSequence: () => Promise<CommandResult>
+): Promise<CommandResult> {
+  if (!args.listVariable || !args.itemVariable) {
+    return {
+      success: false,
+      message: 'No list variable or item variable provided',
+    };
+  }
+
+  const listStr = store.getValue(args.listVariable);
+  if (!listStr) {
+    return {
+      success: false,
+      message: `Variable ${args.listVariable} not found`,
+    };
+  }
+
+  const items = listStr.split(',').map((item: string) => item.trim());
+
+  for (const item of items) {
+    store.addKeyValueToStore(args.itemVariable, item);
+    const result = await runSequence();
+    if (!result.success) return result;
+  }
+
+  return { success: true } as CommandResult;
 }
 
 export async function repeatXTimes(args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>): Promise<CommandResult> {
