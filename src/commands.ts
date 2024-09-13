@@ -114,6 +114,34 @@ const controlCommands: Command[] = [
     "function": uninterruptCommand,
     "requiresExactMatch": true,
   },
+  {
+    "format": "read file ${filePath} into ${variableName}",
+    "description": "Reads the contents of the file at the given path and stores it in the specified variable.",
+    "type": CommandType.Function,
+    "function": controls.readFromFile,
+    "requiresExactMatch": false,
+  },
+  {
+    "format": "fetch url ${url} into ${variableName}",
+    "description": "Fetches the content from the given URL and stores it in the specified variable.",
+    "type": CommandType.Function,
+    "function": controls.fetchUrlContent,
+    "requiresExactMatch": false,
+  },
+  {
+    "format": "calculate ${expression} into ${variableName}",
+    "description": "Calculates the given mathematical expression and stores the result in the specified variable.",
+    "type": CommandType.Function,
+    "function": controls.calculateExpression,
+    "requiresExactMatch": false,
+  },
+  {
+    "format": "list files in ${directoryPath} into ${variableName}",
+    "description": "Lists files in the specified directory and stores the list in the specified variable.",
+    "type": CommandType.Function,
+    "function": controls.listFilesInDirectory,
+    "requiresExactMatch": false,
+  },
 ];
 
 function getUserCommandsFromFile(path: string): Command[] {

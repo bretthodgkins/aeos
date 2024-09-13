@@ -7,5 +7,40 @@
         'console log ${lastGeneratedText}',
       ]
     },
+    {
+      // Example 1: Read from a file and display its content
+      format: 'read and display file ${filePath}',
+      sequence: [
+        'read file ${filePath} into fileContent',
+        'console log Contents of ${filePath}:',
+        'console log ${fileContent}',
+      ],
+    },
+    {
+      // Example 2: Fetch content from a URL and display it
+      format: 'fetch and display url ${url}',
+      sequence: [
+        'fetch url ${url} into urlContent',
+        'console log Contents of ${url}:',
+        'console log ${urlContent}',
+      ],
+    },
+    {
+      // Example 3: Calculate an expression and display the result
+      format: 'calculate and display ${expression}',
+      sequence: [
+        'calculate ${expression} into calculationResult',
+        'console log Result of ${expression}: ${calculationResult}',
+      ],
+    },
+    {
+      // Example 4: List files in a directory and display them
+      format: 'list files in ${directoryPath}',
+      sequence: [
+        'list files in ${directoryPath} into fileList',
+        'console log Files in ${directoryPath}:',
+        'console log ${fileList}',
+      ],
+    },
   ]
 }

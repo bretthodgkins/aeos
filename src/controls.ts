@@ -1,3 +1,4 @@
+import { evaluate } from 'mathjs';
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -182,4 +183,92 @@ export async function downloadFromURL(args: Record<string, string>): Promise<Com
     });
 
   return { success: true } as CommandResult;
+}
+
+export async function readFromFile(args: Record<string, string>): Promise<CommandResult> {
+  if (!args.filePath || !args.variableName) {
+    return {
+      success: false,
+      message: 'No file path or variable name provided',
+    };
+  }
+
+  try {
+    const content = await fs.promises.readFile(args.filePath, 'utf-8');
+    store.addKeyValueToStore(args.variableName, content.replace(/\n/g, '\\n'));
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Unable to read file ${args.filePath}: ${err.message}`,
+    };
+  }
+}
+
+export async function fetchUrlContent(args: Record<string, string>): Promise<CommandResult> {
+  if (!args.url || !args.variableName) {
+    return {
+      success: false,
+      message: 'No URL or variable name provided',
+    };
+  }
+
+  return new Promise((resolve) => {
+    request(args.url, (error: any, response: any, body: any) => {
+      if (error) {
+        resolve({
+          success: false,
+          message: `Failed to fetch URL ${args.url}: ${error.message}`,
+        });
+      } else if (response.statusCode !== 200) {
+        resolve({
+          success: false,
+          message: `Failed to fetch URL ${args.url}: Status code ${response.statusCode}`,
+        });
+      } else {
+        store.addKeyValueToStore(args.variableName, body.replace(/\n/g, '\\n'));
+        resolve({ success: true });
+      }
+    });
+  });
+}
+
+export async function calculateExpression(args: Record<string, string>): Promise<CommandResult> {
+  if (!args.expression || !args.variableName) {
+    return {
+      success: false,
+      message: 'No expression or variable name provided',
+    };
+  }
+
+  try {
+    const result = evaluate(args.expression);
+    store.addKeyValueToStore(args.variableName, result.toString());
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Failed to calculate expression ${args.expression}: ${err.message}`,
+    };
+  }
+}
+
+export async function listFilesInDirectory(args: Record<string, string>): Promise<CommandResult> {
+  if (!args.directoryPath || !args.variableName) {
+    return {
+      success: false,
+      message: 'No directory path or variable name provided',
+    };
+  }
+
+  try {
+    const files = await fs.promises.readdir(args.directoryPath);
+    store.addKeyValueToStore(args.variableName, files.join(', '));
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Unable to list files in directory ${args.directoryPath}: ${err.message}`,
+    };
+  }
 }
