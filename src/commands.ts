@@ -1,6 +1,6 @@
 import * as controls from './controls';
 import * as chatCompletion from './chatCompletion';
-import * as flowControls from './flow_controls';
+import * as flowControls from './flowControls';
 import * as utils from './utils';
 import config from './config';
 import logger from "./logger";
@@ -16,7 +16,7 @@ import {
   CommandResult,
   CommandType,
   getCommandInputString,
-} from './command_types';
+} from './commandTypes';
 
 const fs = require('fs');
 const path = require('path');

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 const JSON5 = require('json5')
 
-import { CommandExample } from './command_types';
+import { CommandExample } from './commandTypes';
 import logger from "./logger";
 
 

@@ -1,7 +1,7 @@
 import { evaluate } from 'mathjs';
 import * as fs from 'fs';
 
-import { Command, CommandType, CommandResult } from './command_types';
+import { Command, CommandType, CommandResult } from './commandTypes';
 import store from './store';
 import logger from "./logger";
 

@@ -25,7 +25,7 @@ import {
   CommandResult,
   CommandType,
   getCommandInputString,
-} from './command_types';
+} from './commandTypes';
 
 // Disable debug logs by default as package
 store.addKeyValueToStore('enableLogToConsole', 'false');

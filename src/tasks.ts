@@ -13,7 +13,7 @@ import logger from "./logger";
 import notifications from './notifications';
 import { promptCreatePlan, promptCreateSubtasks, promptFindCommandsRelevantToObjective } from "./taskPrompts";
 import { getAllCommandFormats, saveCommandToFile } from "./commands";
-import { Command, CommandInput, CommandType } from "./command_types";
+import { Command, CommandInput, CommandType } from "./commandTypes";
 
 
 type Plan = {

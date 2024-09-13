@@ -2,7 +2,7 @@ import {
   CommandInput, 
   getCommandInputString, 
   setCommandInputString,
-} from './command_types';
+} from './commandTypes';
 
 import config from './config';
 

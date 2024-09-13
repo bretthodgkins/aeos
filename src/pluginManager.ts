@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-import { Command } from './command_types';
+import { Command } from './commandTypes';
 
 import config from './config';
 import AeosPlugin from './pluginInterface';

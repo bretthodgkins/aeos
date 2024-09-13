@@ -1,6 +1,6 @@
 import { 
   Command,
-} from './command_types';
+} from './commandTypes';
 
 
 export default interface AeosPlugin {
