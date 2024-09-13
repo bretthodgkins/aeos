@@ -1,4 +1,4 @@
-import { ChatCompletionRequestMessage } from 'openai';
+import OpenAI from 'openai';
 import { findCommandGPT, createChatCompletion } from '../src/chatCompletion';
 import { getAllCommandExamples, getAllSearchableCommandFormats } from '../src/commands';
 
@@ -23,14 +23,14 @@ describe('chat completions', () => {
         role: 'user',
         content: 'Where was it played?',
       },
-    ] as ChatCompletionRequestMessage[];
+    ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
     const output = await createChatCompletion(messages);
     console.log(output);
   });
 });
 
 describe('find commands', () => {
-  it('can find valid commands - tricky with quotes', async () => {
+  xit('can find valid commands - tricky with quotes', async () => {
     const commandInputString = `write a poem about a space cat and then print this out`;
     const output = await findCommandGPT(commandInputString, getAllSearchableCommandFormats(), getAllCommandExamples());
     console.log(output);

@@ -7,7 +7,6 @@ import store from './store';
 import AeosPlugin from './pluginInterface';
 
 import * as chatCompletion from './chatCompletion';
-import * as textCompletion from './textCompletion';
 
 import { 
   getAllCommandFormats,
@@ -60,5 +59,4 @@ export {
   logger, 
   notifications,
   store,
-  textCompletion,
 };

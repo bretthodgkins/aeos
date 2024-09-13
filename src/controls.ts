@@ -6,7 +6,7 @@ const request = require('request');
 
 import { CommandResult } from '../src/command_types';
 
-import * as textCompletion from './textCompletion';
+import { getChatCompletion } from './chatCompletion';
 import logger from "./logger";
 import notifications from './notifications';
 import store from './store';
@@ -23,7 +23,7 @@ export async function generateText(args: Record<string, string>): Promise<Comman
   const temperature = args.temperature ? Number(args.temperature) : 0.3;
   const maxTokens = args.maxTokens ? Number(args.maxTokens) : 2000;
 
-  const response = await textCompletion.generateText(args.prompt, 2000, 0.3);
+  const response = await getChatCompletion(args.prompt, 2000, 0.3);
   const cleanResponse = response.trimStart().replace(/\n/g, '\\n').trim();
   store.addKeyValueToStore('lastGeneratedText', cleanResponse);
 
