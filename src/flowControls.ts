@@ -42,7 +42,7 @@ export function getFlowControlFromFormat(format: string): Command {
   };
 }
 
-function expandVariables(str: string): string {
+export function expandVariables(str: string): string {
   return str.replace(/\$\{(\w+)\}/g, (match, variableName) => {
     const value = store.getValue(variableName);
     return value !== undefined ? String(value) : match;
