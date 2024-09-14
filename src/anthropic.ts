@@ -5,7 +5,7 @@ import {
   FunctionDefinition,
   FunctionCall,
   Message,
-} from './functionCalling';
+} from './languageModelTypes';
 
 const client = new Anthropic(); // gets API Key from environment variable ANTHROPIC_API_KEY
 
@@ -31,7 +31,7 @@ async function createTools(functionDefinitions: FunctionDefinition[]) {
   });
 }
 
-export async function createMessage(systemMessage: string, messages: Message[]): Promise<string> {
+export async function createMessageAnthropic(systemMessage: string, messages: Message[]): Promise<string> {
   const anthropicMessages = await createMessages(messages);
   const message = await client.messages.create({
     model: 'claude-3-5-sonnet-20240620',
@@ -43,7 +43,7 @@ export async function createMessage(systemMessage: string, messages: Message[]):
   return message.content[0].text;
 }
 
-export async function callFunction(systemMessage: string, messages: Message[], functionDefinitions: FunctionDefinition[], forceToolUse?: string): Promise<FunctionCall> {
+export async function callFunctionAnthropic(systemMessage: string, messages: Message[], functionDefinitions: FunctionDefinition[], forceToolUse?: string): Promise<FunctionCall> {
   const anthropicMessages = await createMessages(messages);
   const anthropicTools = await createTools(functionDefinitions);
   let toolChoice = { type: 'auto' } as any;

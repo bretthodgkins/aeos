@@ -8,6 +8,7 @@ const defaultConfig = {
   configuration: {
     enableLogToConsole: true, // enables debug logs
     enableLogToFile: true, // writes debug logs to ./access.log
+    modelProvider: 'openai', // anthropic, openai
   },
   userVariables: {
     // key value pairs that will be available on startup
@@ -116,11 +117,28 @@ class Config {
       return;
     }
 
-    this.config = inputJson;
+    this.config = {
+      configuration: { ...defaultConfig.configuration, ...inputJson.configuration },
+      userVariables: { ...defaultConfig.userVariables, ...inputJson.userVariables },
+      plugins: inputJson.plugins || [],
+    }
   }
 
   getConfiguration(): Record<string, string> {
     return this.config.configuration;
+  }
+
+  getConfigurationSetting(key: string): any {
+    return this.config.configuration[key];
+  }
+
+  setConfigurationSetting(key: string, value: any): void {
+    this.config.configuration[key] = value;
+  }
+
+  saveConfigurationSetting(key: string, value: any): void {
+    this.config.configuration[key] = value;
+    this.saveConfig();
   }
 
   getUserVariables(): Record<string, string> {

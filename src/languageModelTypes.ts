@@ -15,6 +15,7 @@ export type FunctionDefinition = {
   name: string;
   description: string;
   properties: Record<string, FunctionProperty>;
+  required: string[];
 };
 
 export type FunctionCall = {

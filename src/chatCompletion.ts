@@ -18,8 +18,8 @@ Do not suggest any commands that aren't listed below. Response must be in a vali
 Available Commands:
 $AVAILABLE_COMMANDS`;
 
-export function convertExamplesToChatCompletionMessages(examples: CommandExample[]): OpenAI.Chat.CreateChatCompletionRequestMessage[] {
-  return examples.reduce((acc: OpenAI.Chat.CreateChatCompletionRequestMessage[], example: CommandExample) => {
+export function convertExamplesToChatCompletionMessages(examples: CommandExample[]): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  return examples.reduce((acc: OpenAI.Chat.Completions.ChatCompletionMessageParam[], example: CommandExample) => {
     const messages = [
       {
         role: 'user',

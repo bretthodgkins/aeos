@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const JSON5 = require('json5')
-import { callFunction, createMessage } from "./anthropic";
+import { createMessage, callFunction } from "./languageModels";
+
 
 import {
   FunctionCall,
   FunctionDefinition,
   Message,
-} from "./functionCalling";
+} from "./languageModelTypes";
 import config from './config';
 import logger from "./logger";
 import notifications from './notifications';

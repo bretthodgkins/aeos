@@ -3,7 +3,6 @@ const { DateTime } = require("luxon");
 import { createWriteStream, WriteStream } from "fs";
 
 import config from "./config";
-import store from "./store";
 
 class Logger {
   private logStream: WriteStream;
@@ -15,11 +14,11 @@ class Logger {
 
   log(message: string) {
     const timestamp = DateTime.now().setZone('Australia/Sydney').toISO();
-    if (store.getValue('enableLogToConsole')) {
+    if (config.getConfigurationSetting('enableLogToConsole')) {
       console.log(`${timestamp} ${message}`);
     }
 
-    if (store.getValue('enableLogToFile')) {
+    if (config.getConfigurationSetting('enableLogToFile')) {
       this.logStream.write(`${timestamp} ${message}\n`);
     }
   }
