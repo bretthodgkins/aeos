@@ -12,18 +12,29 @@ import {
 import config from './config';
 import logger from "./logger";
 import notifications from './notifications';
-import { promptCreatePlan, promptCreateSubtasks, promptFindCommandsRelevantToObjective } from "./taskPrompts";
-import { getAllCommandFormats, saveCommandToFile } from "./commands";
-import { Command, CommandInput, CommandType } from "./commandTypes";
+import { 
+  promptCreatePlan,
+  promptCreateSubtasks, 
+  promptIdentifyCommandsRelevantToObjective,
+  promptIdentifySequenceOfCommands,
+} from "./taskPrompts";
+import { addToAllCommands, createCommandFromJSON, createCommandInputFromJSON, getAllCommandFormats, getCommandExecutablesFromCommandInput, saveCommandToFile } from "./commands";
+import { Command, CommandExecutable, CommandInput, CommandType } from "./commandTypes";
+import { assert } from "console";
 
+export type PlanState = {
+  currentTask: Task;
+  completedTasks: Task[];
+}
 
-type Plan = {
+export type Plan = {
   name: string;
   task: Task;
   additionalInfoNeeded: string;
+  currentState: PlanState;
 };
 
-enum TaskCategory {
+export enum TaskCategory {
   Discrete = 'discrete',
   Sequence = 'sequence',
   Manual = 'manual',
@@ -31,21 +42,33 @@ enum TaskCategory {
   // Continuous = 'Continuous'
 }
 
-type Task = {
+export type Task = {
   objective: string;
   category: TaskCategory;
-  command?: string;
+  command?: CommandInput;
   impact: number;
   impactRationale: string;
   feasibility: number;
   feasibilityRationale: string;
-  executionOrder?: number;
+  executionOrder: number;
   subtasks: Task[];
   parent?: Task;
 };
 
 
 let allPlans = [] as Plan[];
+
+export function getAllPlans(): Plan[] {
+  return allPlans;
+}
+
+export function addPlan(plan: Plan): void {
+  allPlans.push(plan);
+}
+
+export function setAllPlans(plans: Plan[]): void {
+  allPlans = plans;
+}
 
 export function loadAllPlans() {
   const userPlans = getUserPlans();
@@ -106,6 +129,11 @@ function getUserPlansFromFile(path: string): Plan[] {
       return [];
     }
 
+    const currentState = inputPlan.currentState || {
+      currentTask: inputPlan.task,
+      completedTasks: [],
+    } as PlanState;
+
     // const planRequiresApplication = inputPlan.requires?.application;
     // const requiresApplication = planRequiresApplication || namespaceRequiresApplication;
     // const requiresExactMatch = inputPlan.requires?.exactMatch || false;
@@ -117,6 +145,7 @@ function getUserPlansFromFile(path: string): Plan[] {
       name,
       task: inputPlan.task,
       additionalInfoNeeded: inputPlan.additionalInfoNeeded || '',
+      currentState
       // requiresApplication: requiresApplication,
       // requiresExactMatch: requiresExactMatch,
     });
@@ -139,20 +168,19 @@ function setAllParentReferences(): void {
   }
 }
 
-function removeAllParentReferences(): Plan[] {
-  function removeParentFromTasks(tasks: Task[]): Task[] {
-    return tasks.map(task => {
-      // Create a new object without the parent property
-      const { parent, ...taskWithoutParent } = task;
-      
-      // Recursively remove parent references from nested subtasks
-      return {
-        ...taskWithoutParent,
-        subtasks: removeParentFromTasks(task.subtasks)
-      };
-    });
-  }
+export function removeParentFromTask(task: Task): Task {
+  const { parent, ...taskWithoutParent } = task;
+  return {
+    ...taskWithoutParent,
+    subtasks: removeParentsFromTasks(task.subtasks)
+  };
+}
 
+export function removeParentsFromTasks(tasks: Task[]): Task[] {
+  return tasks.map(task => removeParentFromTask(task));
+}
+
+export function removeParentsFromPlans(): Plan[] {
   // Create a new task list with subtasks that have no parent references
   return allPlans.map(plan => {
     // Recursively remove parent references from nested subtasks
@@ -160,7 +188,7 @@ function removeAllParentReferences(): Plan[] {
       ...plan,
       task: {
         ...plan.task,
-        subtasks: removeParentFromTasks(plan.task.subtasks)
+        subtasks: removeParentsFromTasks(plan.task.subtasks)
       }
     };
   });
@@ -173,7 +201,7 @@ function saveAllPlansToFile() {
   fs.mkdirSync(plansDirectory, { recursive: true });
 
   // Remove parent references before saving to file
-  const plansWithoutParents = removeAllParentReferences();
+  const plansWithoutParents = removeParentsFromPlans();
   
   // Write the plans to the file
   fs.writeFileSync(path.join(plansDirectory, 'default.json5'), JSON5.stringify({ plans: plansWithoutParents }, null, 2));
@@ -183,12 +211,32 @@ export async function identifyRelevantCommands(objective: string): Promise<strin
   const allCommandFormats = getAllCommandFormats().sort();
   const userMessage: Message = {
     role: 'user',
-    content: promptFindCommandsRelevantToObjective(allCommandFormats, objective),
+    content: promptIdentifyCommandsRelevantToObjective(allCommandFormats, objective),
   };
   const message = await createMessage('', [userMessage]);
   const commands = message.split('<relevant_commands>')[1].split('</relevant_commands>')[0].trim().split('\n');
   return commands;
 }
+
+export async function identifySequenceOfCommands(objective: string): Promise<CommandInput> {
+  const allCommandFormats = getAllCommandFormats().sort();
+  const userMessage: Message = {
+    role: 'user',
+    content: promptIdentifySequenceOfCommands(allCommandFormats, objective),
+  };
+  try {
+    const message = await createMessage('', [userMessage]);
+    const sequenceText = message.split('<answer>')[1].split('</answer>')[0].trim();
+    const sequenceJSON = JSON5.parse(sequenceText);
+    const commandInput = createCommandInputFromJSON(sequenceJSON);
+    const command = createCommandFromJSON(sequenceJSON);
+    await addToAllCommands(command); // enables the command to be executed later
+    return commandInput;
+  } catch (e: any) {
+    logger.log(`Error identifying sequence of commands: ${e.message}`);
+    throw 'Error identifying sequence of commands';
+  }
+ }
 
 async function createPlan(description: string, allRelevantCommands: string[]): Promise<Plan> {
   const functionDefinition: FunctionDefinition = {
@@ -208,25 +256,31 @@ async function createPlan(description: string, allRelevantCommands: string[]): P
         description: "Provide a summary of any additional information required to refine the objective statement, otherwise, leave this field empty.",
       },
     },
+    required: ['objective', 'name'],
   };
   const userMessage: Message = {
     role: 'user',
     content: promptCreatePlan(description, allRelevantCommands),
   };
   const functionCall = await callFunction('', [userMessage], [functionDefinition], functionDefinition.name);
+  const task = {
+    executionOrder: 1,
+    objective: functionCall.input.objective,
+    category: TaskCategory.Complex,
+    impact: 1,
+    impactRationale: '',
+    feasibility: 1,
+    feasibilityRationale: '',
+    subtasks: [],
+  };
   return {
     name: functionCall.input.name,
     additionalInfoNeeded: functionCall.input.additionalInfoNeeded,
-    task: {
-      category: TaskCategory.Complex,
-      impact: 1,
-      impactRationale: '',
-      feasibility: 1,
-      feasibilityRationale: '',
-      executionOrder: 1,
-      objective: functionCall.input.objective,
-      subtasks: [],
-    }
+    task: task,
+    currentState: {
+      currentTask: task,
+      completedTasks: [],
+    },
   };
 }
 
@@ -250,10 +304,10 @@ async function createSubtasks(objective: string, parent: Task, tree: string, all
               enum: ['discrete', 'sequence', 'manual', 'complex'],
               description: `The classification of the task based on its nature and complexity. Choose from:
 - Discrete: A task achievable by executing a single, specific function or action.
-- Sequence: A task that could be achieved by executing a series of discrete functions with flow control.
-- Manual: A discrete task that would require a human or physical intervention and cannot be fully automated.
+- Sequence: A task that could be achieved by executing a combination of the available commands listed with flow control.
+- Manual: A discrete task that would require a human or physical intervention, and where zero aspect of it could be automated.
 - Complex: A multi-faceted task that can be broken down into subtasks of various categories.
-Select the most appropriate category that best describes the task's characteristics and requirements. If the task could not be achieved with a discrete action, or a simple script that combines discrete actions, consider it a complex task.`,
+Select the most appropriate category that best describes the task's characteristics and requirements. Choose complex if unsure.`,
             },
             availableCommand: {
               type: 'string',
@@ -284,6 +338,7 @@ Select the most appropriate category that best describes the task's characterist
         },
       },
     },
+    required: ['subtasks'],
   };
   const userMessage: Message = {
     role: 'user',
@@ -331,11 +386,22 @@ export function getTreeStructure(plan: Plan): string {
   return lines.join('\n');
 }
 
-function isTaskComplete(task: Task): boolean {
+function isTaskFullyPlanned(task: Task): boolean {
   if (task.subtasks.length === 0) {
     return task.command !== undefined;
   }
-  return task.subtasks.every(subtask => isTaskComplete(subtask) || isTaskBelowImpactThreshold(subtask));
+  return task.subtasks.every(subtask => isTaskFullyPlanned(subtask) || isTaskBelowImpactThreshold(subtask));
+}
+
+export function isTaskComplete(plan: Plan, task: Task): boolean {
+  if (task.subtasks.length === 0) {
+    if (task.category === TaskCategory.Complex) {
+      return false; // complex tasks need to be expanded
+    } else {
+      return plan.currentState.completedTasks.includes(task);
+    }
+  }
+  return task.subtasks.every(subtask => isTaskComplete(plan, subtask));
 }
 
 function isTaskBelowImpactThreshold(task: Task): boolean {
@@ -351,7 +417,7 @@ function isTaskBelowImpactThreshold(task: Task): boolean {
 }
 
 function findLeastFeasibleIncompleteSubtask(task: Task): Task | undefined {
-  if (isTaskComplete(task)) return undefined;
+  if (isTaskFullyPlanned(task)) return undefined;
 
   let leastFeasibleSubtask = task;
   let leastFeasibleScore = 1;
@@ -361,7 +427,7 @@ function findLeastFeasibleIncompleteSubtask(task: Task): Task | undefined {
   while (subtasks.length > 0) {
     for (let subtask of subtasks) {
       leastFeasibleScore = 1;
-      if (isTaskComplete(subtask)) continue;
+      if (isTaskFullyPlanned(subtask)) continue;
       if (subtask.feasibility < leastFeasibleScore) {
         leastFeasibleScore = subtask.feasibility;
         leastFeasibleSubtask = subtask;
@@ -392,13 +458,13 @@ function calculateFeasibility(tasks: Task[]): number {
   return Math.pow(weightedProduct, 1 / totalImpact);
 }
 
-export async function planAndExecute(description: string): Promise<boolean> {
+export async function startPlanning(description: string): Promise<boolean> {
   let plan = findPlan(description);
   if (!plan) {
     plan = await createPlanAndTasks(description);
   }
 
-  while (!isTaskComplete(plan.task)) {
+  while (!isTaskFullyPlanned(plan.task)) {
     const result = await continuePlanning(plan);
     if (!result) {
       return false;
@@ -408,7 +474,7 @@ export async function planAndExecute(description: string): Promise<boolean> {
   return true;
 }
 
-export async function createPlanAndTasks(description: string): Promise<Plan> {
+async function createPlanAndTasks(description: string): Promise<Plan> {
   const relevantCommands = await identifyRelevantCommands(description);
   // console.log(`Relevant commands:\n${relevantCommands.join('\n')}`);
 
@@ -425,7 +491,7 @@ export async function createPlanAndTasks(description: string): Promise<Plan> {
   return plan;
 }
 
-export async function continuePlanning(plan: Plan): Promise<boolean> {
+async function continuePlanning(plan: Plan): Promise<boolean> {
   // Check for any incomplete manual tasks on the least feasible path
 
   const nextTask = findLeastFeasibleIncompleteSubtask(plan.task);
@@ -443,22 +509,7 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
   } else if (nextTask.category !== TaskCategory.Complex) {
     nextTask.command = `create command "${nextTask.objective}"`;
   } else {
-    const parentTask = nextTask?.parent;
-    if (!parentTask) {
-      logger.log(`Error: No parent task found for subtask: "${nextTask.objective}"`);
-      return false;
-    }
-    const relevantCommands = await identifyRelevantCommands(nextTask.objective);
-
-    const tree = getTreeStructure(plan);
-    const subtasks = await createSubtasks(nextTask.objective, nextTask, tree, relevantCommands);
-    nextTask.subtasks = subtasks;
-
-    // TODO traverse the tree and update feasibility scores
-    const revisedFeasibility = calculateFeasibility(nextTask.subtasks);
-    console.log(`Revised feasibility: ${revisedFeasibility}`);
-
-    nextTask.feasibility = revisedFeasibility;
+    await reviewComplexTask(plan, nextTask);
   }
 
   saveAllPlansToFile();
@@ -467,6 +518,53 @@ export async function continuePlanning(plan: Plan): Promise<boolean> {
   console.log(`\n\n${updatedTree}`);
 
   return true;
+}
+
+export async function reviewStrategy(plan: Plan): Promise<void> {
+  // Review recent history, passes and failures
+  // CommandResults
+
+  // is current strategy working?
+  // do we continue, tweak or abandon?
+
+  // if abandon,
+  // delete current task
+  // set current task to parent task
+  // and decide next step
+
+  // if tweak,
+  // update current strategy
+  // add, remove, update subtasks
+  // update execution order
+  // update feasibility, impact?
+
+  // if continue,
+  // no changes required
+}
+
+// complex tasks will be broken down into subtasks
+export async function reviewComplexTask(plan: Plan, task: Task): Promise<void> {
+  assert(task.category === TaskCategory.Complex, 'Task must be complex');
+  assert(task.subtasks.length === 0, 'Task must not have subtasks');
+
+  const relevantCommands = await identifyRelevantCommands(task.objective);
+  const tree = getTreeStructure(plan);
+  const subtasks = await createSubtasks(task.objective, task, tree, relevantCommands);
+  task.subtasks = subtasks;
+
+  // TODO traverse the tree and update feasibility scores
+  const revisedFeasibility = calculateFeasibility(task.subtasks);
+  task.feasibility = revisedFeasibility;
+}
+
+// sequence tasks will be converted into a sequence of commands
+// if unsuccessful, the task will be become complex
+export async function reviewSequenceTask(plan: Plan, task: Task): Promise<void> {
+  // todo generate sequence of commands
+  const generatedSequence = [
+    '',
+  ];
+
 }
 
 export async function savePlanAsCommand(plan: Plan): Promise<boolean> {

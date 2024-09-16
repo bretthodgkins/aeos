@@ -47,6 +47,221 @@ Here's an example of how your response should be structured:
 Begin your analysis and selection of relevant commands now.
 `;
 
+export const PROMPT_IDENTIFY_SEQUENCE_OF_COMMANDS = `
+You are an AI assistant tasked with analyzing automation objectives and a list of available commands. Your goal is to identify how to achieve the given objective by sequencing the provided commands. You may need to use flow control statements to achieve the objective. Your output should be a JSON object that conforms to a strict schema.
+
+Here is the objective you need to achieve:
+<objective>
+{{OBJECTIVE}}
+</objective>
+
+Here is the list of available commands:
+<commands>
+{{COMMANDS}}
+</commands>
+
+The output should conform to the following schema:
+<schema>
+export type CommandInput = string | FlowCommandInput;
+
+export type FlowCommandInput = {
+  command: string;
+  sequence: CommandInput[];
+  alternativeSequence?: CommandInput[];
+} 
+
+export const FlowControlCommands = [
+  'repeat \${x} times': repeatXTimes,
+  'repeat \${x} times with index \${index}': repeatXTimesWithIndex,
+  'for each line of \${filename}': forEachLineOfFile,
+  'try': tryCatch,
+  'if \${condition}': ifCondition,
+  'while \${condition}': whileCondition,
+  'for each \${itemVariable} in \${listVariable}': forEachItemInList,
+];
+
+</schema>
+
+Here are some examples to guide you:
+<examples>
+<example>
+<input>
+Navigate to https://example.com, click on the "Login" button, enter the username "testuser" and password "testpass", then click the "Submit" button.
+</input>
+<output>
+{
+  "command": "navigate and login",
+  "sequence": [
+    "browser:goto https://example.com",
+    "browser:focus element by id login-button",
+    "browser:send keys Enter",
+    "browser:focus element by id username-field",
+    "browser:send text testuser",
+    "browser:focus element by id password-field",
+    "browser:send text testpass",
+    "browser:focus element by id submit-button",
+    "browser:send keys Enter"
+  ]
+}
+</output>
+</example>
+
+<example>
+<input>
+Download the file from https://example.com/data.csv, read its contents, and append each line to a new file called "processed_data.txt" if it contains the word "important".
+</input>
+<output>
+{
+  "command": "process csv file",
+  "sequence": [
+    "download https://example.com/data.csv data.csv",
+    {
+      "command": "for each line of data.csv",
+      "sequence": [
+        {
+          "command": "if line contains \"important\"",
+          "sequence": [
+            "append line to file processed_data.txt"
+          ]
+        }
+      ]
+    }
+  ]
+}
+</output>
+</example>
+
+<example>
+<input>
+Generate a list of 5 random numbers between 1 and 100, then calculate their sum and average.
+</input>
+<output>
+{
+  "command": "generate and calculate statistics",
+  "sequence": [
+    "store numbers []",
+    {
+      "command": "repeat 5 times with index i",
+      "sequence": [
+        "generate text \"Generate a random number between 1 and 100\"",
+        "store numbers[i] generated_number"
+      ]
+    },
+    "calculate sum(numbers) into total",
+    "calculate total / 5 into average",
+    "console log \"Sum: \${total}, Average: \${average}\""
+  ]
+}
+</output>
+</example>
+
+<example>
+<input>
+Scrape the titles of all articles from the homepage of https://news.example.com, and send an email with the results to user@example.com.
+</input>
+<output>
+{
+  "command": "scrape and email",
+  "sequence": [
+    "browser:goto https://news.example.com",
+    "browser:scrape document.querySelectorAll('article h2').map(el => el.textContent)",
+    "store scraped_titles result",
+    "generate text \"Create an email body with the following titles: \${scraped_titles}\"",
+    "send email to user@example.com with subject \"Today's News Titles\" and body generated_text"
+  ]
+}
+</output>
+</example>
+
+<example>
+<input>
+Create a spreadsheet of the top 10 most visited pages on a website by scraping the analytics data from https://analytics.example.com, then save it as "top_pages.xlsx".
+</input>
+<output>
+{
+  "command": "scrape analytics and create spreadsheet",
+  "sequence": [
+    "browser:goto https://analytics.example.com",
+    "browser:wait for () => document.querySelector('.analytics-table')",
+    "browser:scrape Array.from(document.querySelectorAll('.analytics-table tr')).slice(1, 11).map(row => ({url: row.cells[0].textContent, visits: row.cells[1].textContent}))",
+    "store analytics_data result",
+    "create a spreadsheet called top_pages.xlsx that contains \"Create a table with two columns: 'URL' and 'Visits'. Fill it with the following data: \${analytics_data}\""
+  ]
+}
+</output>
+</example>
+<example>
+<input>
+Check if a file named "config.json" exists in the current directory. If it does, read its contents and log them. If it doesn't, create the file with some default content.
+</input>
+<output>
+{
+  "command": "check file existence and act accordingly",
+  "sequence": [
+    "list files in ./ into directoryContents",
+    {
+      "command": "if directoryContents includes \"config.json\"",
+      "sequence": [
+        "read file config.json into configContents",
+        "console log \"Config file contents: \${configContents}\""
+      ],
+      "alternativeSequence": [
+        "store defaultConfig { \"setting1\": \"default\", \"setting2\": 123 }",
+        "write defaultConfig to file config.json",
+        "console log \"Created new config file with default settings\""
+      ]
+    }
+  ]
+}
+</output>
+</example>
+
+<example>
+<input>
+Attempt to fetch data from https://api.example.com/data. If successful, process the data and save it to a file. If the fetch fails, log an error message and send a notification to the user.
+</input>
+<output>
+{
+  "command": "fetch data with error handling",
+  "sequence": [
+    {
+      "command": "try",
+      "sequence": [
+        "fetch url https://api.example.com/data into apiData",
+        "generate text \"Process the following data: \${apiData}\"",
+        "write generated_text to file processed_data.txt",
+        "console log \"Data successfully fetched and processed\""
+      ],
+      "alternativeSequence": [
+        "console log \"Error: Failed to fetch data from API\"",
+        "notification \"API Fetch Failed\" \"Unable to retrieve data from https://api.example.com/data. Please check your connection and try again later.\""
+      ]
+    }
+  ]
+}
+</output>
+</example>
+</examples>
+
+To approach this task, follow these steps:
+1. Carefully read and understand the objective.
+2. Review the list of available commands and their functionalities.
+3. Plan a sequence of commands that will achieve the objective.
+4. Consider if any flow control statements (like loops or conditionals) are necessary to achieve the objective.
+5. Ensure that your plan uses only the available commands and valid flow control statements.
+6. Structure your solution according to the provided schema.
+
+When you're ready to provide your answer, format it as a JSON object that strictly adheres to the given schema. Enclose your entire response within <answer> tags.
+
+Remember:
+- Use only the commands provided in the list.
+- Make sure your JSON is valid and follows the schema exactly.
+- Include comments in your JSON to explain your reasoning where appropriate.
+
+Begin your response now:
+<answer>
+`;
+
 export const PROMPT_CREATE_PLAN = `
 You are an AI assistant specialized in task analysis and definition. Your role is to transform a user-provided task description into a clear, actionable objective statement and a concise task name. 
 
@@ -111,8 +326,8 @@ Using this information, break down the objective into smaller subtasks. For each
 1. Objective statement
 2. Task category, chosen from the following options:
    - Discrete: A task achievable by executing a single, specific function or action.
-   - Sequence: A task that could be achieved by executing a series of discrete functions with flow control.
-   - Manual: A discrete task that would require a human or physical intervention and cannot be fully automated.
+   - Sequence: A task that could be achieved by executing a combination of the available commands listed with flow control.
+   - Manual: A discrete task that would require a human or physical intervention, and where zero aspect of it could be automated.
    - Complex: A multi-faceted task that can be broken down into subtasks of various categories.
 3. Available command (if exists, otherwise leave empty)
 4. Impact score (0-1)
@@ -139,8 +354,14 @@ Remember:
 Begin your analysis now, and provide the subtask breakdown as specified above.
 `;
 
-export function promptFindCommandsRelevantToObjective(commands: string[], objective: string): string {
+export function promptIdentifyCommandsRelevantToObjective(commands: string[], objective: string): string {
   return PROMPT_FIND_RELEVANT_COMMANDS_TO_OBJECTIVE
+    .replace('{{COMMANDS}}', commands.join('\n'))
+    .replace('{{OBJECTIVE}}', objective);
+}
+
+export function promptIdentifySequenceOfCommands(commands: string[], objective: string): string {
+  return PROMPT_IDENTIFY_SEQUENCE_OF_COMMANDS
     .replace('{{COMMANDS}}', commands.join('\n'))
     .replace('{{OBJECTIVE}}', objective);
 }

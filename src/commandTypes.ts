@@ -7,24 +7,6 @@ export enum CommandType {
 // A CommandInput is an input received from the user that can be either a string or a FlowCommandInput
 export type CommandInput = string | FlowCommandInput;
 
-export function getCommandInputString(commandInput: CommandInput): string {
-  if (typeof commandInput === 'string') {
-    return commandInput;
-  }
-  return commandInput.command;
-}
-
-export function setCommandInputString(commandInput: CommandInput, newValue: string): CommandInput {
-  if (typeof commandInput === 'string') {
-    return newValue;
-  }
-  return {
-    command: newValue,
-    sequence: commandInput.sequence,
-    alternativeSequence: commandInput.alternativeSequence,
-  }
-}
-
 // A FlowCommandInput is a command that contains a sequence of commands to execute via a specified flow control
 export type FlowCommandInput = {
   command: string;
@@ -63,3 +45,20 @@ export type CommandResult = {
   message?: string;
 }
 
+export function getCommandInputString(commandInput: CommandInput): string {
+  if (typeof commandInput === 'string') {
+    return commandInput;
+  }
+  return commandInput.command;
+}
+
+export function setCommandInputString(commandInput: CommandInput, newValue: string): CommandInput {
+  if (typeof commandInput === 'string') {
+    return newValue;
+  }
+  return {
+    command: newValue,
+    sequence: commandInput.sequence,
+    alternativeSequence: commandInput.alternativeSequence,
+  }
+}

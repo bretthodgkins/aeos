@@ -17,6 +17,7 @@ import {
   CommandType,
   getCommandInputString,
 } from './commandTypes';
+import { assert } from 'console';
 
 const fs = require('fs');
 const path = require('path');
@@ -165,31 +166,58 @@ function getUserCommandsFromFile(path: string): Command[] {
 
   let commandList: Command[] = [];
   for (let inputCommand of inputJson.commands) {
-    if (!inputCommand.format || !inputCommand.sequence || inputCommand.sequence.length === 0) {
+    try {
+      const command = createCommandFromJSON(inputCommand);
+      commandList.push(command);
+    } catch (e: any) {
       notifications.push("Error", `Invalid command found in ${path}`);
-      return [];
+      console.log(e);
+      console.log(JSON.stringify(inputCommand, null, 2));
     }
-
-    const commandRequiresApplication = inputCommand.requires?.application;
-    const requiresApplication = commandRequiresApplication || namespaceRequiresApplication;
-    const requiresExactMatch = inputCommand.requires?.exactMatch || false;
-    
-    // TODO validate sequence as imported
-    const format = `${namespace}${inputCommand.format}`;
-    //logger.log(`Importing command: ${format}, requires application: ${requiresApplication}`);
-    commandList.push({
-      format,
-      type: CommandType.Sequence,
-      sequence: inputCommand.sequence,
-      alternativeSequence: inputCommand.alternativeSequence,
-      requiresApplication: requiresApplication,
-      requiresExactMatch: requiresExactMatch,
-      examples: inputCommand.examples,
-    });
   }
 
   logger.log(`Imported ${commandList.length} commands from ${path}`);
   return commandList;
+}
+
+export function createCommandInputFromJSON(commandJson: any): CommandInput {
+    if (!commandJson.command || !commandJson.sequence || commandJson.sequence.length === 0) {
+      throw ('Invalid command');
+    }
+    
+    // TODO validate sequence as imported
+    return {
+      command: commandJson.command,
+      sequence: commandJson.sequence,
+      alternativeSequence: commandJson.alternativeSequence,
+    };
+}
+
+export function createCommandFromJSON(commandJson: any, namespace: string = '', namespaceRequiresApplication?: string): Command {
+    if (!commandJson.sequence || commandJson.sequence.length === 0) {
+      throw ('Invalid command - must have sequence');
+    }
+
+    if (!commandJson.command && !commandJson.format) {
+      throw ('Invalid command - must have command OR format');
+    }
+    const format = commandJson.format || commandJson.command;
+    const formatWithNamespace = `${namespace}${format}`;
+
+    const commandRequiresApplication = commandJson.requires?.application;
+    const requiresApplication = commandRequiresApplication || namespaceRequiresApplication;
+    const requiresExactMatch = commandJson.requires?.exactMatch || false;
+    
+    // TODO validate sequence as imported
+    return {
+      format: formatWithNamespace,
+      type: CommandType.Sequence,
+      sequence: commandJson.sequence,
+      alternativeSequence: commandJson.alternativeSequence,
+      requiresApplication: requiresApplication,
+      requiresExactMatch: requiresExactMatch,
+      examples: commandJson.examples,
+    };
 }
 
 export function saveCommandToFile(command: Command, filename: string) {
@@ -246,6 +274,9 @@ export function loadAllCommands() {
   logger.log(`Loaded ${userCommands.length} user-defined command${userCommands.length === 1 ? '' : 's'}`);
 }
 
+export function addToAllCommands(command: Command) {
+  allCommands.push(command);
+}
 
 export function getAllCommandFormats(): string[] {
   return allCommands.map(command => command.format);

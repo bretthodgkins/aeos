@@ -16,14 +16,16 @@ import {
 
 import { 
   loadAllPlans,
-  createPlanAndTasks,
-  continuePlanning,
   getTreeStructure,
   findPlan,
   savePlanAsCommand,
-  planAndExecute,
+  startPlanning,
   identifyRelevantCommands,
-} from './tasks';
+} from './plans';
+
+import {
+  executePlan,
+} from './planExecution';
 
 import AeosPlugin from './pluginInterface';
 
@@ -91,29 +93,8 @@ async function main() {
 
 
   program
-    .command('objective <description>')
-    .description('plan and execute a new task to achieve an objective')
-    .action(async (description) => {
-      if (program.opts().debug) {
-        store.addKeyValueToStore('enableLogToConsole', 'true');
-      }
-
-      if (program.opts().log) {
-        store.addKeyValueToStore('enableLogToFile', 'true');
-      }
-
-      const result = await planAndExecute(description);
-    
-      if (result) {
-        logger.log(`Task resolved successfully`);
-      } else {
-        logger.log(`Task failed.`);
-      }
-    });
-
-  program
     .command('plan <description>')
-    .description('describe a new task to start planning for')
+    .description('create a new plan')
     .action(async (description) => {
       if (program.opts().debug) {
         store.addKeyValueToStore('enableLogToConsole', 'true');
@@ -123,33 +104,7 @@ async function main() {
         store.addKeyValueToStore('enableLogToFile', 'true');
       }
 
-      const result = await createPlanAndTasks(description);
-    
-      if (result) {
-        logger.log(`Task resolved successfully`);
-      } else {
-        logger.log(`Task failed.`);
-      }
-    });
-
-  program
-    .command('continue <planName>')
-    .description('specify a plan to continue planning')
-    .action(async (planName) => {
-      if (program.opts().debug) {
-        store.addKeyValueToStore('enableLogToConsole', 'true');
-      }
-
-      if (program.opts().log) {
-        store.addKeyValueToStore('enableLogToFile', 'true');
-      }
-
-      const plan = findPlan(planName);
-      if (!plan) {
-        logger.log(`Plan ${planName} not found`);
-        return;
-      }
-      const result = await continuePlanning(plan);
+      const result = await startPlanning(description);
     
       if (result) {
         logger.log(`Task resolved successfully`);
