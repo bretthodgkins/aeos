@@ -184,11 +184,18 @@ export function removeParentsFromPlans(): Plan[] {
   // Create a new task list with subtasks that have no parent references
   return allPlans.map(plan => {
     // Recursively remove parent references from nested subtasks
+    const { task, currentState, ...planWithoutTask } = plan;
+    const { parent, ...taskWithoutParent } = task;
     return {
-      ...plan,
+      ...planWithoutTask,
       task: {
-        ...plan.task,
+        ...taskWithoutParent,
         subtasks: removeParentsFromTasks(plan.task.subtasks)
+      },
+      currentState: {
+        ...currentState,
+        currentTask: removeParentFromTask(currentState.currentTask),
+        completedTasks: removeParentsFromTasks(currentState.completedTasks)
       }
     };
   });
@@ -205,6 +212,7 @@ function saveAllPlansToFile() {
   
   // Write the plans to the file
   fs.writeFileSync(path.join(plansDirectory, 'default.json5'), JSON5.stringify({ plans: plansWithoutParents }, null, 2));
+  console.log(`Saved ${allPlans.length} plan${allPlans.length === 1 ? '' : 's'} to ${plansDirectory}`);
 }
 
 export async function identifyRelevantCommands(objective: string): Promise<string[]> {

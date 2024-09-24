@@ -6,25 +6,26 @@ import {
   findPlan,
   loadAllPlans,
 } from '../src/plans';
-import * as plansExports from '../src/plans';
+
+import { 
+  loadAllCommands,
+} from '../src/commands';
 
 import {
   executePlan,
   getNextTask, 
 } from '../src/planExecution';
 
-import { exec } from 'child_process';
-
 jest.setTimeout(100000); // 100 seconds
 
 describe('Plan Execution', () => {
   beforeAll(async () => { 
-    // loadAllCommands();
+    loadAllCommands();
     loadAllPlans();
   });
 
-  xit('can execute plan', async () => {
-    const planName = 'Launch Online Shoe Store';
+  it('can execute plan', async () => {
+    const planName = 'Write and Save Fish Poem';
     const plan = findPlan(planName);
     expect(plan).toBeDefined();
     if (!plan) {

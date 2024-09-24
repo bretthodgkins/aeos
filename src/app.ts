@@ -161,6 +161,31 @@ async function main() {
     });
 
   program
+    .command('execute <planName>')
+    .description('execute an existing plan')
+    .action(async (planName) => {
+      if (program.opts().debug) {
+        store.addKeyValueToStore('enableLogToConsole', 'true');
+      }
+
+      if (program.opts().log) {
+        store.addKeyValueToStore('enableLogToFile', 'true');
+      }
+
+      const plan = findPlan(planName);
+      if (!plan) {
+        logger.log(`Plan ${planName} not found`);
+        return;
+      }
+      const success = await executePlan(plan);
+      if (success) {
+        logger.log(`Plan executed successfully`);
+      } else {
+        logger.log(`Plan failed.`);
+      }
+    });
+
+  program
     .command('plugins')
     .description('list all plugins')
     .action(() => {

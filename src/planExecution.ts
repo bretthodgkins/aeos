@@ -18,6 +18,11 @@ import { runCommands } from './commands';
 import { CommandInput } from './commandTypes';
 
 export async function executePlan(plan: Plan): Promise<boolean> {
+  // set current task
+  const nextTask = await getNextTask(plan);
+  if (!nextTask) return true
+  plan.currentState.currentTask = nextTask;
+
   const totalAttempts = 3;
   for (let i = 0; i < totalAttempts; i++) {
     console.log(`Attempt ${i + 1}`);
@@ -61,6 +66,7 @@ export async function executePlan(plan: Plan): Promise<boolean> {
         // if not, create one
         throw new Error('Not implemented - creating command for discrete task');
       }
+      currentCommand = currentTask.command;
     }
     if (!currentCommand) {
       throw new Error(`No command identified for task: ${currentTask.objective}`);
