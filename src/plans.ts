@@ -2,11 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const JSON5 = require('json5')
 import { v4 as uuidv4 } from 'uuid';
+
 import { createMessage, callFunction } from "./languageModels";
 
-
 import {
-  FunctionCall,
   FunctionDefinition,
   Message,
 } from "./languageModelTypes";

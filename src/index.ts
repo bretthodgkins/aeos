@@ -4,6 +4,7 @@ import logger from './logger';
 import notifications from './notifications';
 import store from './store';
 import config from './config';
+import pluginManager from './pluginManager';
 
 import AeosPlugin from './pluginInterface';
 
@@ -70,5 +71,6 @@ export {
   config,
   logger, 
   notifications,
+  pluginManager,
   store,
 };

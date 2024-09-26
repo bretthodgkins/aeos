@@ -208,8 +208,13 @@ async function main() {
   program
     .command('install <plugin>')
     .description('provide a npm package name or local path')
-    .action((plugin) => {
-      pluginManager.installPlugin(plugin);
+    .action(async (plugin) => {
+      const success = await pluginManager.installPlugin(plugin);
+      if (success) {
+        logger.log(`Plugin "${plugin}" installed successfully`);
+      } else {
+        logger.log(`Plugin "${plugin}" failed to install`);
+      }
     });
 
   program

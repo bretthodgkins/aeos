@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { Command } from './commandTypes';
 
 import config from './config';
+import logger from "./logger";
 import AeosPlugin from './pluginInterface';
 
 class PluginManager {
@@ -33,16 +34,16 @@ class PluginManager {
         this.plugins.set(input, plugin);
         return true;
       } catch(e) {
-        console.log(`Error: Unable to load plugin ${input}\n`);
+        logger.log(`Error: Unable to load plugin ${input}\n`);
         return false;
       }
   }
 
-  async installPlugin(input: string): Promise<void> {
+  async installPlugin(input: string): Promise<boolean> {
     // check if plugin is already installed
     if (this.plugins.has(input)) {
-      console.log(`Plugin "${input}" is already installed`);
-      return;
+      logger.log(`Plugin "${input}" is already installed`);
+      return false;
     }
 
     const fullPath = path.resolve(input);
@@ -51,8 +52,8 @@ class PluginManager {
     if (fs.existsSync(fullPath)) {
       const success = await this.loadPlugin(fullPath);
       if (!success) {
-        console.log(`Error: Unable to load plugin ${fullPath}`);
-        return;
+        logger.log(`Error: Unable to load plugin ${fullPath}`);
+        return false;
       }
       config.addPlugin(fullPath);
     } else {
@@ -66,19 +67,20 @@ class PluginManager {
         try {
           execSync(`npm install --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
-          console.error(`\nFailed to install plugin ${input}`);
-          return;
+          logger.log(`\nFailed to install plugin ${input}`);
+          return false;
         }
       }
       const success = await this.loadPlugin(input);
       if (!success) {
-        console.log(`Error: Unable to load plugin ${input}`);
-        return;
+        logger.log(`Error: Unable to load plugin ${input}`);
+        return false;
       }
       config.addPlugin(input);
     }
 
     config.saveConfig();
+    return true;
   }
 
   async uninstallPlugin(input: string): Promise<void> {
@@ -92,7 +94,7 @@ class PluginManager {
         try {
           execSync(`npm uninstall --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
-          console.error(`\nEncountered error while uninstalling plugin ${input}`);
+          logger.log(`\nEncountered error while uninstalling plugin ${input}`);
         }
       }
       config.removePlugin(input);
@@ -105,13 +107,13 @@ class PluginManager {
   async updatePlugin(input: string): Promise<void> {
     // check if plugin is installed
     if (!this.plugins.has(input)) {
-      console.log(`Plugin "${input}" not installed`);
+      logger.log(`Plugin "${input}" not installed`);
       return;
     }
 
     // Perform npm update if input is an npm package
     if (fs.existsSync(input)) { // not installed locally
-      console.log(`Plugin "${input}" is a local plugin. Please update manually.`);
+      logger.log(`Plugin "${input}" is a local plugin. Please update manually.`);
       return;
     } else {
       const installedPath = path.join(config.getPluginsDirectory(), 'node_modules', input);
@@ -119,7 +121,7 @@ class PluginManager {
         try {
           execSync(`npm update --prefix ${config.getPluginsDirectory()} ${input}`, { stdio: 'inherit' });
         } catch (error) {
-          console.error(`\nEncountered error while updating plugin ${input}`);
+          logger.log(`\nEncountered error while updating plugin ${input}`);
         }
       }
     }
@@ -137,4 +139,5 @@ class PluginManager {
     return this.plugins;
   }
 }
+
 export default new PluginManager();
