@@ -3,6 +3,7 @@ require('dotenv').config()
 import logger from './logger';
 import notifications from './notifications';
 import store from './store';
+import config from './config';
 
 import AeosPlugin from './pluginInterface';
 
@@ -27,6 +28,14 @@ import {
   getCommandInputString,
 } from './commandTypes';
 
+import {
+  Message,
+} from './languageModelTypes';
+
+import {
+  createMessage,
+} from './languageModels';
+
 // Disable debug logs by default as package
 store.addKeyValueToStore('enableLogToConsole', 'false');
 store.addKeyValueToStore('enableLogToFile', 'false');
@@ -40,22 +49,25 @@ export {
   CommandInput,
   CommandResult,
   CommandType,
+  Message,
 };
 
 // functions
 export {
+  createMessage,
   getAllCommandFormats,
   getCommandExecutablesFromCommandInput,
   getCommandFromFormat,
   getCommandInputString,
   getIsRunning,
+  runCommands,
   setIsRunningFalse,
-  runCommands
 };
 
 // the rest
 export { 
   chatCompletion,
+  config,
   logger, 
   notifications,
   store,

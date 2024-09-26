@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 import { 
   FunctionDefinition,
   Message,
@@ -41,6 +43,7 @@ describe('removeParentsFromPlans', () => {
 
   it('should remove parent references from all plans', () => {
     const mockTask: Task = {
+      id: uuidv4(),
       objective: 'Test task',
       category: TaskCategory.Discrete,
       impact: 5,
@@ -92,6 +95,7 @@ describe('removeParentsFromPlans', () => {
 
   it('should handle plans with no subtasks', () => {
     const mockTask = {
+      id: uuidv4(),
       objective: 'Test task',
       category: TaskCategory.Discrete,
       impact: 5,

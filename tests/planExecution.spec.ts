@@ -1,9 +1,12 @@
+import { v4 as uuidv4 } from 'uuid';
+
 import { 
   Plan, 
   PlanState,
   Task, 
   TaskCategory, 
   findPlan,
+  findTask,
   loadAllPlans,
 } from '../src/plans';
 
@@ -40,6 +43,7 @@ describe('Plan Execution', () => {
 describe('getNextTask', () => {
   // Helper function to create a basic task
   const createTask = (objective: string, executionOrder: number, subtasks: Task[] = []): Task => ({
+    id: uuidv4(),
     objective,
     category: TaskCategory.Discrete,
     impact: 1,
@@ -55,7 +59,7 @@ describe('getNextTask', () => {
     name: 'Test Plan',
     task: currentTask,
     additionalInfoNeeded: '',
-    currentState: { currentTask, completedTasks: [] },
+    currentState: { currentTaskId: currentTask.id, completedTasks: [] },
   });
 
   beforeEach(() => {
@@ -64,7 +68,7 @@ describe('getNextTask', () => {
   it('should return null when all tasks are complete', () => {
     const task = createTask('Root', 1);
     const plan = createPlan(task);
-    plan.currentState.completedTasks = [task];
+    plan.currentState.completedTasks = [task.id];
 
     const result = getNextTask(plan);
     expect(result).toBeNull();
@@ -78,10 +82,10 @@ describe('getNextTask', () => {
     subtask2.parent = task;
     const plan = createPlan(subtask1);
 
-    plan.currentState.completedTasks = [subtask1];
+    plan.currentState.completedTasks = [subtask1.id];
 
-    const result = getNextTask(plan);
-    expect(result).toBe(subtask2);
+    const nextTaskId = getNextTask(plan);
+    expect(nextTaskId).toBe(subtask2.id);
   });
 
   it('should return null if all subtasks are complete', () => {
@@ -89,7 +93,7 @@ describe('getNextTask', () => {
     const task = createTask('Root', 1, [subtask]);
     subtask.parent = task;
     const plan = createPlan(subtask);
-    plan.currentState.completedTasks = [subtask];
+    plan.currentState.completedTasks = [subtask.id];
 
     const result = getNextTask(plan);
     expect(result).toBeNull();
@@ -108,20 +112,35 @@ describe('getNextTask', () => {
     const plan = createPlan(task);
 
     plan.currentState.completedTasks = [];
-    const result = getNextTask(plan);
+    const nextTaskId1 = getNextTask(plan);
+    expect(nextTaskId1).toBe(nestedSubtask1.id);
+    if (!nextTaskId1) {
+      throw new Error('Expected nextTaskId1 to be defined');
+    }
+    const result = findTask(plan, nextTaskId1);
     expect(result?.objective).toBe(nestedSubtask1?.objective);
 
-    plan.currentState.completedTasks.push(nestedSubtask1);
-    const result2 = getNextTask(plan);
+    plan.currentState.completedTasks.push(nestedSubtask1.id);
+    const nextTaskId2 = getNextTask(plan);
+    expect(nextTaskId2).toBe(nestedSubtask2.id);
+    if (!nextTaskId2) {
+      throw new Error('Expected nextTaskId2 to be defined');
+    }
+    const result2 = findTask(plan, nextTaskId2);
     expect(result2?.objective).toBe(nestedSubtask2?.objective);
 
-    plan.currentState.completedTasks.push(nestedSubtask2);
-    const result3 = getNextTask(plan);
+    plan.currentState.completedTasks.push(nestedSubtask2.id);
+    const nextTaskId3 = getNextTask(plan);
+    expect(nextTaskId3).toBe(subtask2.id);
+    if (!nextTaskId3) {
+      throw new Error('Expected nextTaskId3 to be defined');
+    }
+    const result3 = findTask(plan, nextTaskId3);
     expect(result3?.objective).toBe(subtask2?.objective);
 
-    plan.currentState.completedTasks.push(subtask2);
-    const result4 = getNextTask(plan);
-    expect(result4).toBeNull();
+    plan.currentState.completedTasks.push(subtask2.id);
+    const nextTaskId4 = getNextTask(plan);
+    expect(nextTaskId4).toBeNull();
   });
 
   it('should return tasks in the correct execution order', () => {
@@ -133,7 +152,12 @@ describe('getNextTask', () => {
     let plan = createPlan(task);
     plan.currentState.completedTasks = [];
 
-    const result = getNextTask(plan);
+    const nextTaskId = getNextTask(plan);
+    expect(nextTaskId).toBe(subtask2.id);
+    if (!nextTaskId) {
+      throw new Error('Expected nextTaskId to be defined');
+    }
+    const result = findTask(plan, nextTaskId);
     expect(result).toBeDefined();
     expect(result?.objective).toBe('Subtask 2');
   });
@@ -151,10 +175,10 @@ describe('getNextTask', () => {
     subtask2.parent = task;
     
     const plan = createPlan(nestedSubtask1);
-    plan.currentState.completedTasks = [nestedSubtask1];
+    plan.currentState.completedTasks = [nestedSubtask1.id];
 
     const result = getNextTask(plan);
-    expect(result).toBe(nestedSubtask2);
+    expect(result).toBe(nestedSubtask2.id);
   });
 
   it('should return null when reaching the end of the task tree', () => {
@@ -162,7 +186,7 @@ describe('getNextTask', () => {
     const task = createTask('Root', 1, [subtask]);
     subtask.parent = task;
     const plan = createPlan(subtask);
-    plan.currentState.completedTasks = [subtask];
+    plan.currentState.completedTasks = [subtask.id];
 
     const result = getNextTask(plan);
     expect(result).toBeNull();
@@ -174,6 +198,6 @@ describe('getNextTask', () => {
     plan.currentState.completedTasks = [];
 
     const result = getNextTask(plan);
-    expect(result).toBe(task);
+    expect(result).toBe(task.id);
   });
 });

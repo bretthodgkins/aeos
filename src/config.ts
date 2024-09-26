@@ -8,7 +8,7 @@ const defaultConfig = {
   configuration: {
     enableLogToConsole: true, // enables debug logs
     enableLogToFile: true, // writes debug logs to ./access.log
-    modelProvider: 'openai', // anthropic, openai
+    modelProvider: 'anthropic', // anthropic, openai
   },
   userVariables: {
     // key value pairs that will be available on startup

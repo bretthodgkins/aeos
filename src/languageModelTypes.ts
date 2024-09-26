@@ -5,6 +5,11 @@ export type Message = {
   content: string;
 };
 
+export type MessageOptions = {
+  maxTokens: number;
+  temperature: number;
+};
+
 export type FunctionProperty = {
   type: string;
   description: string;

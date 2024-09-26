@@ -1,17 +1,20 @@
 import exp from 'constants';
 import { 
-  loadAllPlans,
-  getTreeStructure,
-  findPlan,
-  savePlanAsCommand,
-  identifyRelevantCommands,
-  reviewComplexTask,
   Plan,
   Task,
-  identifySequenceOfCommands,
   TaskCategory,
+  TaskId,
+  findPlan,
+  findTask,
+  getTreeStructure,
+  identifyRelevantCommands,
+  identifySequenceOfCommands,
   isTaskComplete,
+  loadAllPlans,
+  reviewComplexTask,
+  savePlanAsCommand,
 } from './plans';
+
 import { assert } from 'console';
 import logger from './logger';
 import { runCommands } from './commands';
@@ -19,15 +22,18 @@ import { CommandInput } from './commandTypes';
 
 export async function executePlan(plan: Plan): Promise<boolean> {
   // set current task
-  const nextTask = await getNextTask(plan);
-  if (!nextTask) return true
-  plan.currentState.currentTask = nextTask;
+  const nextTaskId = await getNextTask(plan);
+  if (!nextTaskId) return true
+  plan.currentState.currentTaskId = nextTaskId;
+  let currentTask = findTask(plan, nextTaskId);
+  if (!currentTask) {
+    throw new Error(`Task with ID ${nextTaskId} not found`);
+  }
 
-  const totalAttempts = 3;
+  const totalAttempts = 10;
   for (let i = 0; i < totalAttempts; i++) {
     console.log(`Attempt ${i + 1}`);
     if (isPlanComplete(plan)) return true;
-    const currentTask = plan.currentState.currentTask;
 
     // if its been decided that the best next task is manual
     // then escalate to a human
@@ -39,9 +45,9 @@ export async function executePlan(plan: Plan): Promise<boolean> {
     if (currentTask.category === TaskCategory.Complex) {
       assert(currentTask.subtasks.length === 0, 'Current task is complex and has already been expanded');
       await reviewComplexTask(plan, currentTask);
-      const nextTask = await getNextTask(plan);
-      if (!nextTask) return true
-      plan.currentState.currentTask = nextTask;
+      const nextTaskId = await getNextTask(plan);
+      if (!nextTaskId) return true
+      plan.currentState.currentTaskId = nextTaskId;
       continue;
     } 
 
@@ -55,9 +61,9 @@ export async function executePlan(plan: Plan): Promise<boolean> {
 
         currentTask.category = TaskCategory.Complex;
         await reviewComplexTask(plan, currentTask);
-        const nextTask = await getNextTask(plan);
-        if (!nextTask) return true
-        plan.currentState.currentTask = nextTask;
+        const nextTaskId = await getNextTask(plan);
+        if (!nextTaskId) return true
+        plan.currentState.currentTaskId = nextTaskId;
         continue;
       }
     } else { // Discrete
@@ -74,12 +80,19 @@ export async function executePlan(plan: Plan): Promise<boolean> {
     }
     const commandResult = await runCommands([currentCommand]);
     if (commandResult.success) {
-      plan.currentState.completedTasks.push(currentTask);
+      plan.currentState.completedTasks.push(currentTask.id);
+    } else {
+      logger.log(`Command failed: ${commandResult.message}`);
+      return false;
     }
 
-    const nextTask = await getNextTask(plan);
-    if (!nextTask) return true
-    plan.currentState.currentTask = nextTask;
+    const nextTaskId = await getNextTask(plan);
+    if (!nextTaskId) return true
+    plan.currentState.currentTaskId = nextTaskId;
+    currentTask = findTask(plan, nextTaskId);
+    if (!currentTask) {
+      throw new Error(`Task with ID ${nextTaskId} not found`);
+    }
     continue;
   }
 
@@ -88,12 +101,16 @@ export async function executePlan(plan: Plan): Promise<boolean> {
 
 // next task must not be completed
 // next task must not be complex and already expanded
-export function getNextTask(plan: Plan): Task | null {
+export function getNextTask(plan: Plan): TaskId | null {
   // choose next subtask based on executionOrder, filter out completed
   // if no subtasks remaining, return parent task
 
   // begin up one level if possible
-  let currentTask = plan.currentState.currentTask.parent ? plan.currentState.currentTask.parent : plan.currentState.currentTask;
+  let currentTask = findTask(plan, plan.currentState.currentTaskId);
+  if (!currentTask) {
+    throw new Error(`Task with ID ${plan.currentState.currentTaskId} not found`);
+  }
+  currentTask = currentTask?.parent ? currentTask.parent : currentTask;
 
   // traverse up until task incomplete
   while (isTaskComplete(plan, currentTask)) {
@@ -108,7 +125,7 @@ export function getNextTask(plan: Plan): Task | null {
     nextChildren = currentTask?.subtasks.filter(task => !isTaskComplete(plan, task)).sort((a, b) => a.executionOrder - b.executionOrder);
   }
 
-  return currentTask;
+  return currentTask.id;
 }
 
 function isPlanComplete(plan: Plan): boolean {

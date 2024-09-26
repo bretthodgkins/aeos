@@ -4,6 +4,7 @@
     "module": "commonjs",
     "strict": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "declaration": true,
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,

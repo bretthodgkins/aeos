@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const JSON5 = require('json5')
+import { v4 as uuidv4 } from 'uuid';
 import { createMessage, callFunction } from "./languageModels";
 
 
@@ -22,9 +23,11 @@ import { addToAllCommands, createCommandFromJSON, createCommandInputFromJSON, ge
 import { Command, CommandExecutable, CommandInput, CommandType } from "./commandTypes";
 import { assert } from "console";
 
+export type TaskId = string;
+
 export type PlanState = {
-  currentTask: Task;
-  completedTasks: Task[];
+  currentTaskId: TaskId;
+  completedTasks: TaskId[];
 }
 
 export type Plan = {
@@ -43,6 +46,7 @@ export enum TaskCategory {
 }
 
 export type Task = {
+  id: TaskId;
   objective: string;
   category: TaskCategory;
   command?: CommandInput;
@@ -130,7 +134,7 @@ function getUserPlansFromFile(path: string): Plan[] {
     }
 
     const currentState = inputPlan.currentState || {
-      currentTask: inputPlan.task,
+      currentTaskId: inputPlan.task.id,
       completedTasks: [],
     } as PlanState;
 
@@ -184,7 +188,7 @@ export function removeParentsFromPlans(): Plan[] {
   // Create a new task list with subtasks that have no parent references
   return allPlans.map(plan => {
     // Recursively remove parent references from nested subtasks
-    const { task, currentState, ...planWithoutTask } = plan;
+    const { task, ...planWithoutTask } = plan;
     const { parent, ...taskWithoutParent } = task;
     return {
       ...planWithoutTask,
@@ -192,11 +196,6 @@ export function removeParentsFromPlans(): Plan[] {
         ...taskWithoutParent,
         subtasks: removeParentsFromTasks(plan.task.subtasks)
       },
-      currentState: {
-        ...currentState,
-        currentTask: removeParentFromTask(currentState.currentTask),
-        completedTasks: removeParentsFromTasks(currentState.completedTasks)
-      }
     };
   });
 }
@@ -213,6 +212,23 @@ function saveAllPlansToFile() {
   // Write the plans to the file
   fs.writeFileSync(path.join(plansDirectory, 'default.json5'), JSON5.stringify({ plans: plansWithoutParents }, null, 2));
   console.log(`Saved ${allPlans.length} plan${allPlans.length === 1 ? '' : 's'} to ${plansDirectory}`);
+}
+
+export function findTask(plan: Plan, taskId: TaskId): Task | undefined {
+  function findTaskInSubtasks(subtasks: Task[]): Task | undefined {
+    for (const subtask of subtasks) {
+      if (subtask.id === taskId) {
+        return subtask;
+      }
+      const found = findTaskInSubtasks(subtask.subtasks);
+      if (found) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+
+  return findTaskInSubtasks([plan.task]);
 }
 
 export async function identifyRelevantCommands(objective: string): Promise<string[]> {
@@ -272,6 +288,7 @@ async function createPlan(description: string, allRelevantCommands: string[]): P
   };
   const functionCall = await callFunction('', [userMessage], [functionDefinition], functionDefinition.name);
   const task = {
+    id: uuidv4(),
     executionOrder: 1,
     objective: functionCall.input.objective,
     category: TaskCategory.Complex,
@@ -286,7 +303,7 @@ async function createPlan(description: string, allRelevantCommands: string[]): P
     additionalInfoNeeded: functionCall.input.additionalInfoNeeded,
     task: task,
     currentState: {
-      currentTask: task,
+      currentTaskId: task.id,
       completedTasks: [],
     },
   };
@@ -406,7 +423,7 @@ export function isTaskComplete(plan: Plan, task: Task): boolean {
     if (task.category === TaskCategory.Complex) {
       return false; // complex tasks need to be expanded
     } else {
-      return plan.currentState.completedTasks.includes(task);
+      return plan.currentState.completedTasks.includes(task.id);
     }
   }
   return task.subtasks.every(subtask => isTaskComplete(plan, subtask));
