@@ -4,18 +4,19 @@ import {
   FunctionDefinition,
   FunctionCall,
   Message,
+  MessageOptions,
 } from './languageModelTypes';
 
 
 import { callFunctionAnthropic, createMessageAnthropic } from "./anthropic";
 import { callFunctionOpenAI, createMessageOpenAI } from "./openai";
 
-export async function createMessage(systemMessage: string, messages: Message[]): Promise<string> {
+export async function createMessage(systemMessage: string, messages: Message[], options: MessageOptions = { maxTokens: 1024, temperature: 0.7 }): Promise<string> {
   const modelProvider = config.getConfigurationSetting('modelProvider');
   if (modelProvider === 'openai') {
-    return await createMessageOpenAI(systemMessage, messages);
+    return await createMessageOpenAI(systemMessage, messages, options);
   } else {
-    return await createMessageAnthropic(systemMessage, messages);
+    return await createMessageAnthropic(systemMessage, messages, options);
   }
 }
 

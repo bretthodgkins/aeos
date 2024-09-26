@@ -5,6 +5,7 @@ import {
   FunctionDefinition,
   FunctionCall,
   Message,
+  MessageOptions,
 } from './languageModelTypes';
 
 const client = new Anthropic(); // gets API Key from environment variable ANTHROPIC_API_KEY
@@ -31,11 +32,12 @@ async function createTools(functionDefinitions: FunctionDefinition[]) {
   });
 }
 
-export async function createMessageAnthropic(systemMessage: string, messages: Message[]): Promise<string> {
+export async function createMessageAnthropic(systemMessage: string, messages: Message[], options: MessageOptions): Promise<string> {
   const anthropicMessages = await createMessages(messages);
   const message = await client.messages.create({
     model: 'claude-3-5-sonnet-20240620',
-    max_tokens: 1024,
+    max_tokens: options.maxTokens,
+    temperature: options.temperature,
     system: systemMessage,
     messages: anthropicMessages,
   }) as any;

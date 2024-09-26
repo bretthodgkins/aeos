@@ -73,7 +73,7 @@ describe('removeParentsFromPlans', () => {
       },
       additionalInfoNeeded: 'None',
       currentState: {
-        currentTask: mockTask,
+        currentTaskId: mockTask.id,
         completedTasks: [],
       }
     };
@@ -110,7 +110,7 @@ describe('removeParentsFromPlans', () => {
       task: mockTask,
       additionalInfoNeeded: 'None',
       currentState: {
-        currentTask: mockTask,
+        currentTaskId: mockTask.id,
         completedTasks: [],
       }
     };

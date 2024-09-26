@@ -5,6 +5,7 @@ import {
   FunctionDefinition,
   FunctionCall,
   Message,
+  MessageOptions,
 } from './languageModelTypes';
 
 const openai = new OpenAI({
@@ -39,7 +40,7 @@ function createTools(functionDefinitions: FunctionDefinition[]): OpenAI.Chat.Com
   });
 }
 
-export async function createMessageOpenAI(systemMessage: string, messages: Message[]): Promise<string> {
+export async function createMessageOpenAI(systemMessage: string, messages: Message[], options: MessageOptions): Promise<string> {
   const systemMessageParam = {
     role: 'system',
     content: systemMessage,
@@ -48,7 +49,8 @@ export async function createMessageOpenAI(systemMessage: string, messages: Messa
   const chatCompletion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [systemMessageParam, ...openAIMessages],
-    max_tokens: 1024,
+    max_tokens: options.maxTokens,
+    temperature: options.temperature,
   });
 
   return chatCompletion.choices[0].message.content as string;

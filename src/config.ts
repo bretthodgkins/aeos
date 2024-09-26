@@ -9,6 +9,7 @@ const defaultConfig = {
     enableLogToConsole: true, // enables debug logs
     enableLogToFile: true, // writes debug logs to ./access.log
     modelProvider: 'anthropic', // anthropic, openai
+    pluginSourceDirectory: null, // directory to store plugin source code, defaults to ./plugins/src
   },
   userVariables: {
     // key value pairs that will be available on startup
@@ -90,6 +91,16 @@ class Config {
     fs.mkdirSync(pluginDir, { recursive: true });
 
     return pluginDir;
+  }
+
+  getPluginsSourceDirectory(): string {
+
+    const pluginSrcDir = path.join(this.getPluginsDirectory(), 'src');
+
+    // Ensure the directory exists
+    fs.mkdirSync(pluginSrcDir, { recursive: true });
+    
+    return pluginSrcDir;
   }
 
   loadConfig(): void {
