@@ -18,9 +18,9 @@ const flowControlMap = {
   string,
   (
     args: Record<string, string>,
-    runSequence: () => Promise<CommandResult>,
-    runAlternativeSequence: () => Promise<CommandResult>
-  ) => Promise<CommandResult>
+    runSequence: () => Promise<CommandResult[]>,
+    runAlternativeSequence: () => Promise<CommandResult[]>
+  ) => Promise<CommandResult[]>
 >;
 
 export function getAllFlowControlFormats(): string[] {
@@ -52,14 +52,16 @@ export function expandVariables(str: string): string {
 
 export async function ifCondition(
   args: Record<string, string>,
-  runSequence: () => Promise<CommandResult>,
-  runAlternativeSequence: () => Promise<CommandResult>
-): Promise<CommandResult> {
+  runSequence: () => Promise<CommandResult[]>,
+  runAlternativeSequence: () => Promise<CommandResult[]>
+): Promise<CommandResult[]> {
   if (!args.condition) {
-    return {
-      success: false,
-      message: 'No condition provided',
-    };
+    return [
+      {
+        success: false,
+        message: 'No condition provided',
+      },
+    ];
   }
 
   const conditionStr = expandVariables(args.condition);
@@ -67,38 +69,57 @@ export async function ifCondition(
   let conditionResult;
   try {
     conditionResult = evaluate(conditionStr);
-  } catch (e) {
-    return {
-      success: false,
-      message: `Failed to evaluate condition: ${conditionStr}`,
-    };
+  } catch (e: any) {
+    return [
+      {
+        success: false,
+        message: `Failed to evaluate condition: ${conditionStr} with error ${e.message}`,
+      },
+    ];
   }
 
   if (conditionResult) {
-    const result = await runSequence();
-    if (!result.success) return result;
+    return [
+      {
+        success: true,
+        message: `Condition "${conditionStr}" is true`
+      },
+      ...await runSequence()
+    ];
   } else if (runAlternativeSequence) {
-    const result = await runAlternativeSequence();
-    if (!result.success) return result;
+    return [
+      {
+        success: true,
+        message: `Condition "${conditionStr}" is false`
+      },
+      ...await runAlternativeSequence()
+    ];
   }
-
-  return { success: true } as CommandResult;
+  return [ 
+    { 
+      success: true,
+      message: `Condition "${conditionStr}" is false`
+    },
+   ] as CommandResult[];
 }
 
 export async function whileCondition(
   args: Record<string, string>,
-  runSequence: () => Promise<CommandResult>,
-  runAlternativeSequence: () => Promise<CommandResult>
-): Promise<CommandResult> {
+  runSequence: () => Promise<CommandResult[]>,
+  _: () => Promise<CommandResult[]>
+): Promise<CommandResult[]> {
   if (!args.condition) {
-    return {
-      success: false,
-      message: 'No condition provided',
-    };
+    return [
+      {
+        success: false,
+        message: 'No condition provided',
+      },
+    ];
   }
 
   const conditionTemplate = args.condition;
 
+  let results: CommandResult[] = [];
   while (true) {
     const conditionStr = expandVariables(conditionTemplate);
 
@@ -106,10 +127,12 @@ export async function whileCondition(
     try {
       conditionResult = evaluate(conditionStr);
     } catch (e: any) {
-      return {
-        success: false,
-        message: `Failed to evaluate condition: ${conditionStr} with error ${e.message}`,
-      };
+      return [
+        {
+          success: false,
+          message: `Failed to evaluate condition: ${conditionStr} with error ${e.message}`,
+        },
+      ];
     }
 
     // Ensure conditionResult is a boolean
@@ -119,137 +142,156 @@ export async function whileCondition(
       conditionResult = Boolean(conditionResult);
     }
 
-    console.log(`Evaluating condition: ${conditionStr} => ${conditionResult}`);
-
     if (!conditionResult) {
-      break;
+      return [
+        {
+          success: true,
+          message: `Condition "${conditionStr}" is false`
+        },
+      ];
     }
 
-    const result = await runSequence();
-    if (!result.success) return result;
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
   }
-
-  return { success: true } as CommandResult;
 }
 
 export async function forEachItemInList(
   args: Record<string, string>,
-  runSequence: () => Promise<CommandResult>,
-  runAlternativeSequence: () => Promise<CommandResult>
-): Promise<CommandResult> {
+  runSequence: () => Promise<CommandResult[]>,
+  runAlternativeSequence: () => Promise<CommandResult[]>
+): Promise<CommandResult[]> {
   if (!args.listVariable || !args.itemVariable) {
-    return {
-      success: false,
-      message: 'No list variable or item variable provided',
-    };
+    return [
+      {
+        success: false,
+        message: 'No list variable or item variable provided',
+      },
+    ];
   }
 
   const listStr = store.getValue(args.listVariable);
   if (!listStr) {
-    return {
-      success: false,
-      message: `Variable ${args.listVariable} not found`,
-    };
+    return [
+      {
+        success: false,
+        message: `Variable ${args.listVariable} not found`,
+      },
+    ];
   }
 
   const items = listStr.split(',').map((item: string) => item.trim());
 
+  let results: CommandResult[] = [];
   for (const item of items) {
     store.addKeyValueToStore(args.itemVariable, item);
-    const result = await runSequence();
-    if (!result.success) return result;
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
   }
 
-  return { success: true } as CommandResult;
+  return results; // returns the last result
 }
 
-export async function repeatXTimes(args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>): Promise<CommandResult> {
+export async function repeatXTimes(args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>): Promise<CommandResult[]> {
   if (!args.x || isNaN(Number(args.x))) {
-    return {
-      success: false,
-      message: `Invalid number of times to repeat, x=${args.x}`,
-    }
+    return [
+      {
+        success: false,
+        message: `Invalid number of times to repeat, x=${args.x}`,
+      },
+    ];
   }
 
   const x = Number(args.x);
 
+  let results: CommandResult[] = [];
   for (let i = 0; i < x; i++) {
-    let result = await runSequence();
-    if (!result.success) return result;
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
   }
 
-  return {
-    success: true,
-  } as CommandResult;
+  return results; // returns the last result
 }
 
-export async function repeatXTimesWithIndex(args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>): Promise<CommandResult> {
+export async function repeatXTimesWithIndex(args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>): Promise<CommandResult[]> {
   if (!args.x || isNaN(Number(args.x))) {
-    return {
-      success: false,
-      message: `Invalid number of times to repeat, x=${args.x}`,
-    }
+    return [
+      {
+        success: false,
+        message: `Invalid number of times to repeat, x=${args.x}`,
+      },
+    ];
   }
 
   if (!args.index) {
-    return {
-      success: false,
-      message: `No index variable name provided`,
-    }
+    return [
+      {
+        success: false,
+        message: `No index variable name provided`,
+      },
+    ];
   }
 
   const x = Number(args.x);
 
+  let results: CommandResult[] = [];
   for (let i = 0; i < x; i++) {
     store.addKeyValueToStore(args.index, i.toString());
-    let result = await runSequence();
-    if (!result.success) return result;
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
   }
 
-  return {
-    success: true,
-  } as CommandResult;
+  return results; // returns the last result
 }
 
-export async function tryCatch(args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>): Promise<CommandResult> {
+export async function tryCatch(args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>): Promise<CommandResult[]> {
+  let results: CommandResult[] = [];
   try {
-    let result = await runSequence();
-    if (!result.success) throw (result.message);
-  } catch (e) {
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) throw (results[results.length-1].message);
+    return results;
+  } catch (e: any) {
     logger.log('Caught failed sequence, running alternative sequence');
-    let result = await runAlternativeSequence();
-    if (!result.success) return result;
+    return [
+      {
+        success: true,
+        message: `Caught failed sequence: ${e.message}`
+      },
+      ...await runAlternativeSequence(),
+    ]
   }
-  return { success: true } as CommandResult;
 }
 
-export async function forEachLineOfFile(args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>): Promise<CommandResult> {
+export async function forEachLineOfFile(args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>): Promise<CommandResult[]> {
   if (!args.filename) {
-    return {
-      success: false,
-      message: `No filename specified`,
-    };
+    return [
+      {
+        success: false,
+        message: `No filename specified`,
+      },
+    ];
   }
 
   const filename = args.filename;
 
   if (!fs.existsSync(filename)) {
-    return {
-      success: false,
-      message: `File not found, filename=${filename}`
-    };
+    return [
+      {
+        success: false,
+        message: `File not found, filename=${filename}`
+      },
+    ];
   }
 
   const fileData = fs.readFileSync(filename, 'utf8');
   const lines = fileData.split('\n');
+  let results: CommandResult[] = [];
   for (let lineOfFile of lines) {
     if (!/\S/.test(lineOfFile)) continue
     store.addKeyValueToStore('lineOfFile', lineOfFile);
-    let result = await runSequence();
-    if (!result.success) return result;
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
   }
 
-  return {
-    success: true,
-  } as CommandResult;
+  return results; // returns the last result
 }

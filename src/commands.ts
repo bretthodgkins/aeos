@@ -53,6 +53,19 @@ const controlCommands: Command[] = [
     ],
   },
   {
+    "format": "javascript ${script}",
+    "description": "runs the provided JavaScript code in a separate Node.js instance, ensuring the main process remains unaffected by errors or crashes",
+    "type": CommandType.Function,
+    "function": controls.executeJavascript,
+    "requiresExactMatch": false,
+    "examples": [
+      {
+        prompt: "what is 724 / 13?",
+        output: [ "javascript console.log(724 / 13);" ],
+      },
+    ],
+  },
+  {
     "format": "wait ${duration} seconds",
     "description": "Waits for the given number of seconds.",
     "type": CommandType.Function,
@@ -389,12 +402,14 @@ export function setIsRunningFalse() {
 }
 
 // runCommands is a recursive function that converts the first commandInput into a command and runs it
-export async function runCommands(commandInputs: CommandInput[]): Promise<CommandResult> {
+export async function runCommands(commandInputs: CommandInput[]): Promise<CommandResult[]> {
   if (!commandInputs || !commandInputs.length) {
-    return {
-      success: false,
-      message: 'No commands to run',
-    }
+    return [
+      {
+        success: false,
+        message: 'No commands to run',
+      },
+    ];
   }
 
   isRunning = true;
@@ -404,10 +419,12 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
   try {
     commandInput = store.injectVariablesIntoCommandInput(commandInput);
   } catch (e: any) {
-    return {
-      success: false,
-      message: e.toString(),
-    }
+    return [
+      {
+        success: false,
+        message: e.toString(),
+      },
+    ];
   }
 
   // convert the first commandInput into a commandExecutable that can be run
@@ -415,18 +432,25 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
   try {
     commandExecutables = await getCommandExecutablesFromCommandInput(commandInput, true);
   } catch (e: any) {
-    return {
-      success: false,
-      message: e.toString(),
-    }
+    return [
+      {
+        success: false,
+        message: e.toString(),
+      },
+    ];
   }
+
+  let results = [] as CommandResult[];
 
   for (let commandExecutable of commandExecutables) {
     if (isInterrupted) {
-      return {
-        success: false,
-        message: 'This command was interupted during execution',
-      }
+      return [
+        ...results,
+        {
+          success: false,
+          message: 'This command was interupted during execution',
+        },
+      ];
     }
 
     let command = commandExecutable.command;
@@ -439,41 +463,50 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
     // all arguments are stored, and accessible in future commands
     store.addMapToStore(args);
 
-    let commandResult = {
-      success: true,
-    } as CommandResult;
     switch (command.type) {
       case CommandType.Function:
         logger.log(`Running command: "${command.format}" with args: ${JSON.stringify(args)}`);
         if (!command.function) {
-          return {
-            success: false,
-            message: `Internal error running the following command: "${command.format}"`,
-          }
+          return [
+            ...results,
+            {
+              success: false,
+              message: `Internal error running the following command: "${command.format}"`,
+            },
+        ]
         }
-        commandResult = await command.function(args) as CommandResult;
+        results.push(await command.function(args) as CommandResult);
         break;
       case CommandType.Sequence:
         if (!command.sequence || !command.sequence.length) {
-          return {
-            success: false,
-            message: `Sequence command missing sequence: "${command.format}"`
-          }
+          return [
+            ...results,
+            {
+              success: false,
+              message: `Sequence command missing sequence: "${command.format}"`
+            },
+          ];
         }
-        commandResult = await runCommands([...command.sequence]);
+        results.push(...await runCommands([...command.sequence]));
         break;
       case CommandType.Flow:
         if (!command.flowControl) {
-          return {
-            success: false,
-            message: `Flow control command missing flow control: "${command.format}"`
-          }
+          return [
+            ...results,
+            {
+              success: false,
+              message: `Flow control command missing flow control: "${command.format}"`
+            },
+          ];
         }
         if (!command.sequence || !command.sequence.length) {
-          return {
-            success: false,
-            message: `Flow control command missing sequence: "${command.format}"`
-          }
+          return [
+            ...results,
+            {
+              success: false,
+              message: `Flow control command missing sequence: "${command.format}"`
+            },
+          ];
         }
 
         const sequence = command.sequence as CommandInput[];
@@ -484,25 +517,19 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
         };
         const runAlternativeSequence = async () => {
           logger.log(`Setting alternative sequence w/ length: ${alternativeSequence?.length}`);
-          if (!alternativeSequence || !alternativeSequence.length) return { success: true } as CommandResult; // no alternative sequence needed, so return true
+          if (!alternativeSequence || !alternativeSequence.length) return [{ success: true }] as CommandResult[]; // no alternative sequence needed, so return true
           return await runCommands([...alternativeSequence]);
         };
-        commandResult = await command.flowControl(args, runSequence, runAlternativeSequence);
+        results.push(...await command.flowControl(args, runSequence, runAlternativeSequence));
         break;
     }
 
-    if (commandResult.success) {
+    if (results.filter(result => !result.success).length) {
       commandInputs.shift();
       if (commandInputs.length) {
-        const commandResult2 = await runCommands(commandInputs);
-        if (!commandResult2.success) {
-          return commandResult2;
-        }
+        results.push(...await runCommands(commandInputs));
       }
-    } else {
-      logger.log(`Failed command: "${command.format}" with args: ${JSON.stringify(args)}`);
-      return commandResult;
     }
   }
-  return { success: true } as CommandResult;
+  return results;
 }

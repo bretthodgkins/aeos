@@ -20,7 +20,7 @@ export type Command = {
   description?: string;
   type: CommandType;
   function?: (...args: any[]) => any;
-  flowControl?: (args: Record<string, string>, runSequence: () => Promise<CommandResult>, runAlternativeSequence: () => Promise<CommandResult>) => Promise<CommandResult>;
+  flowControl?: (args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>) => Promise<CommandResult[]>;
   sequence?: CommandInput[];
   alternativeSequence?: CommandInput[]; // used in if-else and try-catch blocks
   requiresApplication?: string; // Application name of active window, or "browser" for Chromium

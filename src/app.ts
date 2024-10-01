@@ -65,12 +65,21 @@ async function main() {
 
       logger.log(`Running commands: ${commands.join(', ')}`);
 
-      const result = await runCommands(commands);
+      const results = await runCommands(commands);
+      if (results.length === 0) {
+        logger.log(`No commands to run`);
+        return;
+      }
+      const finalResult = results[results.length - 1];
     
-      if (result.success) {
-        logger.log(`Commands resolved successfully`);
+      if (finalResult.success) {
+        if (finalResult.message) {
+          logger.log(`Commands resolved successfully - ${finalResult.message}`);
+        } else {
+          logger.log(`Commands resolved successfully`);
+        }
       } else {
-        logger.log(`Commands failed. ${result.message}`);
+        logger.log(`Commands failed. ${finalResult.message}`);
       }
     });
 

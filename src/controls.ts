@@ -1,8 +1,12 @@
 import { evaluate } from 'mathjs';
-const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const request = require('request');
+
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 import { CommandResult } from './commandTypes';
 
@@ -28,6 +32,37 @@ export async function generateText(args: Record<string, string>): Promise<Comman
   store.addKeyValueToStore('lastGeneratedText', cleanResponse);
 
   return { success: true } as CommandResult;
+}
+
+export async function executeJavascript(args: Record<string, string>): Promise<CommandResult> {
+  if (!args.script) {
+    return {
+      success: false,
+      message: 'No script provided',
+    };
+  }
+
+  try {
+    // Run the JavaScript in a separate Node instance using 'exec'
+    const { stdout, stderr } = await execAsync(`node -e "${args.script}"`);
+
+    if (stderr) {
+      return {
+        success: false,
+        message: stderr,
+      };
+    }
+
+    return {
+      success: true,
+      message: stdout,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: (error as Error).message,
+    };
+  }
 }
 
 export async function consoleLog(args: Record<string, string>): Promise<CommandResult> {

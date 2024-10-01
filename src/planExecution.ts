@@ -78,11 +78,17 @@ export async function executePlan(plan: Plan): Promise<boolean> {
       throw new Error(`No command identified for task: ${currentTask.objective}`);
       return false;
     }
-    const commandResult = await runCommands([currentCommand]);
-    if (commandResult.success) {
+    const commandResults = await runCommands([currentCommand]);
+    if (commandResults.length === 0) {
+      logger.log(`No commands to run`);
+      return false;
+    }
+    const finalResult = commandResults[commandResults.length - 1];
+    if (finalResult.success) {
+      // TODO store command results
       plan.currentState.completedTasks.push(currentTask.id);
     } else {
-      logger.log(`Command failed: ${commandResult.message}`);
+      logger.log(`Command failed: ${finalResult.message}`);
       return false;
     }
 
