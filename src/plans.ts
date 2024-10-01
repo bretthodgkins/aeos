@@ -373,6 +373,7 @@ Select the most appropriate category that best describes the task's characterist
     const command = subtask.availableCommand && subtask.availableCommand.trim() !== '' ? subtask.availableCommand : undefined;
     const category = command ? TaskCategory.Discrete : subtask.category;
     return {
+      id: uuidv4(),
       objective: subtask.objective,
       category: category,
       command: command,
@@ -531,8 +532,17 @@ async function continuePlanning(plan: Plan): Promise<boolean> {
   if (nextTask.category === TaskCategory.Manual) {
     nextTask.command = `notification "Human Intervention Required" "Please help me complete the following task: ${nextTask.objective} ${nextTask.feasibilityRationale}"`;
   } else if (nextTask.category !== TaskCategory.Complex) {
-    nextTask.command = `create command "${nextTask.objective}"`;
-  } else {
+      try {
+        nextTask.command = await identifySequenceOfCommands(nextTask.objective);
+      } catch (e) {
+        logger.log(`Failed to identify sequence of commands for objective: "${nextTask.objective}"`);
+        logger.log(`Recategorising as complex task...`);
+
+        nextTask.category = TaskCategory.Complex;
+      }
+  }
+  
+  if (nextTask.category === TaskCategory.Complex) {
     await reviewComplexTask(plan, nextTask);
   }
 

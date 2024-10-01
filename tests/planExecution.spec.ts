@@ -28,7 +28,7 @@ describe('Plan Execution', () => {
   });
 
   it('can execute plan', async () => {
-    const planName = 'Write and Save Fish Poem';
+    const planName = 'Count Lines in test.txt';
     const plan = findPlan(planName);
     expect(plan).toBeDefined();
     if (!plan) {
