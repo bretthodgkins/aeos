@@ -516,6 +516,35 @@ async function createPlanAndTasks(description: string): Promise<Plan> {
   return plan;
 }
 
+// if not a complex task, identify sequence of commands
+// if unsuccessful, recategorise as complex task
+// for complex tasks, break down into subtasks
+export async function planTask(plan: Plan, task: Task): Promise<void> {
+  if (task.category === TaskCategory.Manual) {
+    task.command = `interrupt "Human Intervention Required" "Please help me complete the following task:\nObjective: ${task.objective}\nRationale: ${task.feasibilityRationale}"`;
+    return;
+  } else if (task.category !== TaskCategory.Complex) {
+    if (task.command) return;
+    try {
+      task.command = await identifySequenceOfCommands(task.objective);
+      if (typeof task.command === 'string') {
+        task.category = TaskCategory.Discrete;
+      } else {
+        task.category = TaskCategory.Sequence;
+      }
+    } catch (e) {
+      logger.log(`Failed to identify sequence of commands for objective: "${task.objective}"`);
+      logger.log(`Recategorising as complex task...`);
+
+      task.category = TaskCategory.Complex;
+    }
+  }
+  
+  if (task.category === TaskCategory.Complex && task.subtasks.length === 0) {
+    await reviewComplexTask(plan, task);
+  }
+}
+
 async function continuePlanning(plan: Plan): Promise<boolean> {
   // Check for any incomplete manual tasks on the least feasible path
 
@@ -529,22 +558,7 @@ async function continuePlanning(plan: Plan): Promise<boolean> {
   console.log(`Rationale: ${nextTask?.feasibilityRationale}`);
   console.log(`Category: ${nextTask?.category}`);
 
-  if (nextTask.category === TaskCategory.Manual) {
-    nextTask.command = `notification "Human Intervention Required" "Please help me complete the following task: ${nextTask.objective} ${nextTask.feasibilityRationale}"`;
-  } else if (nextTask.category !== TaskCategory.Complex) {
-      try {
-        nextTask.command = await identifySequenceOfCommands(nextTask.objective);
-      } catch (e) {
-        logger.log(`Failed to identify sequence of commands for objective: "${nextTask.objective}"`);
-        logger.log(`Recategorising as complex task...`);
-
-        nextTask.category = TaskCategory.Complex;
-      }
-  }
-  
-  if (nextTask.category === TaskCategory.Complex) {
-    await reviewComplexTask(plan, nextTask);
-  }
+  await planTask(plan, nextTask);
 
   saveAllPlansToFile();
 

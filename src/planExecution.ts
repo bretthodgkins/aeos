@@ -11,6 +11,7 @@ import {
   identifySequenceOfCommands,
   isTaskComplete,
   loadAllPlans,
+  planTask,
   reviewComplexTask,
   savePlanAsCommand,
 } from './plans';
@@ -18,7 +19,7 @@ import {
 import { assert } from 'console';
 import logger from './logger';
 import { runCommands } from './commands';
-import { CommandInput } from './commandTypes';
+import { CommandInput, CommandResult } from './commandTypes';
 
 export async function executePlan(plan: Plan): Promise<boolean> {
   // set current task
@@ -35,55 +36,9 @@ export async function executePlan(plan: Plan): Promise<boolean> {
     console.log(`Attempt ${i + 1}`);
     if (isPlanComplete(plan)) return true;
 
-    // if its been decided that the best next task is manual
-    // then escalate to a human
-    if (currentTask.category === TaskCategory.Manual) {
-      console.log('Escalating to human');
-      return false;
-    }
+    await planTask(plan, currentTask);
+    const finalResult = await executeTask(currentTask);
 
-    if (currentTask.category === TaskCategory.Complex) {
-      assert(currentTask.subtasks.length === 0, 'Current task is complex and has already been expanded');
-      await reviewComplexTask(plan, currentTask);
-      const nextTaskId = await getNextTask(plan);
-      if (!nextTaskId) return true
-      plan.currentState.currentTaskId = nextTaskId;
-      continue;
-    } 
-
-    let currentCommand: CommandInput | null = null;
-    if (currentTask.category === TaskCategory.Sequence) {
-      try {
-        currentCommand = await identifySequenceOfCommands(currentTask.objective);
-      } catch (e) {
-        logger.log(`Failed to identify sequence of commands for objective: "${currentTask.objective}"`);
-        logger.log(`Recategorising as complex task...`);
-
-        currentTask.category = TaskCategory.Complex;
-        await reviewComplexTask(plan, currentTask);
-        const nextTaskId = await getNextTask(plan);
-        if (!nextTaskId) return true
-        plan.currentState.currentTaskId = nextTaskId;
-        continue;
-      }
-    } else { // Discrete
-      if (!currentTask.command) {
-        // check if there's a single existing command that will achieve objective
-        // if not, create one
-        throw new Error('Not implemented - creating command for discrete task');
-      }
-      currentCommand = currentTask.command;
-    }
-    if (!currentCommand) {
-      throw new Error(`No command identified for task: ${currentTask.objective}`);
-      return false;
-    }
-    const commandResults = await runCommands([currentCommand]);
-    if (commandResults.length === 0) {
-      logger.log(`No commands to run`);
-      return false;
-    }
-    const finalResult = commandResults[commandResults.length - 1];
     if (finalResult.success) {
       // TODO store command results
       plan.currentState.completedTasks.push(currentTask.id);
@@ -138,4 +93,19 @@ function isPlanComplete(plan: Plan): boolean {
   // TODO currently no validation
   // it just returns true if all discrete tasks have been completed
   return isTaskComplete(plan, plan.task);
+}
+
+async function executeTask(task: Task): Promise<CommandResult> {
+  if (task.category === TaskCategory.Complex) {
+    throw new Error(`Task ${task.id} is complex and cannot be executed`);
+  }
+  if (!task.command) {
+    throw new Error(`Task ${task.id} has no command to execute`);
+  }
+
+  const commandResults = await runCommands([task.command]);
+  if (commandResults.length === 0) {
+    throw new Error(`No command results returned`);
+  }
+  return commandResults[commandResults.length - 1];
 }

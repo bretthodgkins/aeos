@@ -73,7 +73,7 @@ export type FlowCommandInput = {
 export const FlowControlCommands = [
   'repeat \${x} times': repeatXTimes,
   'repeat \${x} times with index \${index}': repeatXTimesWithIndex,
-  'for each line of \${filename}': forEachLineOfFile,
+  'for each line of file \${filename}': forEachLineOfFile,
   'try': tryCatch,
   'if \${condition}': ifCondition,
   'while \${condition}': whileCondition,
@@ -116,7 +116,7 @@ Download the file from https://example.com/data.csv, read its contents, and appe
   "sequence": [
     "download https://example.com/data.csv data.csv",
     {
-      "command": "for each line of data.csv",
+      "command": "for each line of file ./data.csv",
       "sequence": [
         {
           "command": "if line contains \"important\"",

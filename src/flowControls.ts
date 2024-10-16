@@ -9,7 +9,8 @@ import logger from "./logger";
 const flowControlMap = {
   'repeat ${x} times': repeatXTimes,
   'repeat ${x} times with index ${index}': repeatXTimesWithIndex,
-  'for each line of ${filename}': forEachLineOfFile,
+  'for each line of file ${filename}': forEachLineOfFile,
+  'for each line of string ${string}': forEachLineOfString,
   'try': tryCatch,
   'if ${condition}': ifCondition,
   'while ${condition}': whileCondition,
@@ -288,6 +289,27 @@ export async function forEachLineOfFile(args: Record<string, string>, runSequenc
   let results: CommandResult[] = [];
   for (let lineOfFile of lines) {
     if (!/\S/.test(lineOfFile)) continue
+    store.addKeyValueToStore('lineOfFile', lineOfFile);
+    results = await runSequence();
+    if (results.length && !results[results.length-1].success) return results;
+  }
+
+  return results; // returns the last result
+}
+
+export async function forEachLineOfString(args: Record<string, string>, runSequence: () => Promise<CommandResult[]>, runAlternativeSequence: () => Promise<CommandResult[]>): Promise<CommandResult[]> {
+  if (!args.string) {
+    return [
+      {
+        success: false,
+        message: `No string specified`,
+      },
+    ];
+  }
+
+  const lines = args.string.split('\n');
+  let results: CommandResult[] = [];
+  for (let lineOfFile of lines) {
     store.addKeyValueToStore('lineOfFile', lineOfFile);
     results = await runSequence();
     if (results.length && !results[results.length-1].success) return results;

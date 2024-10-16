@@ -122,8 +122,22 @@ const controlCommands: Command[] = [
     "requiresExactMatch": false,
   },
   {
+    "format": 'interrupt',
+    "description": "Interrupts command execution.",
+    "type": CommandType.Function,
+    "function": interruptCommand,
+    "requiresExactMatch": true,
+  },
+  {
+    "format": 'interrupt ${title} ${body}',
+    "description": "Interrupts command execution after displaying a notification",
+    "type": CommandType.Function,
+    "function": interruptCommand,
+    "requiresExactMatch": true,
+  },
+  {
     "format": 'uninterrupt',
-    "description": "Resets the interupt flag. If you've interupted a command, this will allow you to continue.",
+    "description": "Resets the interrupt flag. If you've interrupted a command, this will allow you to continue.",
     "type": CommandType.Function,
     "function": uninterruptCommand,
     "requiresExactMatch": true,
@@ -316,7 +330,27 @@ export function getCommandFromFormat(format: string): Command | undefined {
 
 export async function getCommandExecutablesFromCommandInput(commandInput: CommandInput, useNLP: boolean): Promise<CommandExecutable[]> {
   let commandInputString = getCommandInputString(commandInput);
-  // get command from available commands
+
+  // Create a command executable without a command format, if its a sequence of commands
+  if (typeof commandInput !== 'string' && commandInput.command === '') {
+    return [
+      {
+        command: {
+          format: '',
+          type: CommandType.Sequence,
+          sequence: commandInput.sequence,
+          alternativeSequence: commandInput.alternativeSequence,
+          requiresApplication: '',
+          requiresExactMatch: true,
+          examples: [],
+        },
+        args: {},
+        commandInput,
+      }
+    ]
+  }
+
+  // Alternatively, lookup command based on matching format
   // TODO only search commands where requirements are met
   let matchingFormats = utils.getMatchingFormatsFromInput(commandInputString, getAllCommandFormats());
 
@@ -379,13 +413,22 @@ export async function getCommandExecutablesFromCommandInput(commandInput: Comman
   return commandExecutableList;
 }
 
-export function interupt() {
-  logger.log('Received interupt command...');
+export function interrupt() {
+  logger.log('Received interrupt command...');
   isInterrupted = true;
 }
 
 export function uninterrupt() {
   isInterrupted = false;
+}
+
+export async function interruptCommand(args: Record<string, string>): Promise<CommandResult> {
+  if (args.body) {
+    notifications.push(args.title ? args.title : 'Interrupted', args.body);
+  }
+
+  interrupt();
+  return { success: true } as CommandResult;
 }
 
 export async function uninterruptCommand(args: Record<string, string>): Promise<CommandResult> {
@@ -448,7 +491,7 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
         ...results,
         {
           success: false,
-          message: 'This command was interupted during execution',
+          message: 'This command was interrupted during execution',
         },
       ];
     }
@@ -523,13 +566,15 @@ export async function runCommands(commandInputs: CommandInput[]): Promise<Comman
         results.push(...await command.flowControl(args, runSequence, runAlternativeSequence));
         break;
     }
+  }
 
-    if (results.filter(result => !result.success).length) {
-      commandInputs.shift();
-      if (commandInputs.length) {
-        results.push(...await runCommands(commandInputs));
-      }
+  // if all commands in the sequence were successful, run the next commandInput
+  if (results.filter(result => !result.success).length === 0) {
+    commandInputs.shift();
+    if (commandInputs.length) {
+      results.push(...await runCommands(commandInputs));
     }
   }
+
   return results;
 }

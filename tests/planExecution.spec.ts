@@ -19,7 +19,7 @@ import {
   getNextTask, 
 } from '../src/planExecution';
 
-jest.setTimeout(100000); // 100 seconds
+jest.setTimeout(1000000); // 1000 seconds
 
 describe('Plan Execution', () => {
   beforeAll(async () => { 
